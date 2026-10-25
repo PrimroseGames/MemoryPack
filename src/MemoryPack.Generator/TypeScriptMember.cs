@@ -182,7 +182,21 @@ public class TypeScriptMember
         var isNullable = (symbol is INamedTypeSymbol nts && nts.EqualsUnconstructedGenericType(references.KnownTypes.System_Nullable_T));
         if (isNullable)
         {
-            var primitiveType = ConvertFromSymbol(((INamedTypeSymbol)symbol).TypeArguments[0], references, options)!;
+            var innerType = ((INamedTypeSymbol)symbol).TypeArguments[0];
+
+            // Check if inner type is a MemoryPackable struct (e.g. PrimletId?)
+            if (innerType.TryGetMemoryPackableType(references, out _, out _))
+            {
+                return new TypeScriptType
+                {
+                    TypeName = $"{innerType.Name} | null",
+                    DefaultValue = "null",
+                    WriteMethodTemplate = "({0} === null ? writer.writeNullObjectHeader() : " + innerType.Name + ".serializeCore(writer, {0}))",
+                    ReadMethodTemplate = "(reader.peekIsNull() ? (reader.advanceOffset(1), null) : " + innerType.Name + ".deserializeCore(reader))"
+                };
+            }
+
+            var primitiveType = ConvertFromSymbol(innerType, references, options)!;
 
             return new TypeScriptType
             {

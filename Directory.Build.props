@@ -7,6 +7,12 @@
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)opensource.snk</AssemblyOriginatorKeyFile>
 
+    <!-- Consumers reference these projects directly instead of the packages. The version has to
+         satisfy package dependencies on MemoryPack (MagicOnion.Serialization.MemoryPack needs
+         >= 1.21.1) so restore picks the project over the package. -->
+    <Version>1.21.4</Version>
+    <AssemblyVersion>1.21.4.0</AssemblyVersion>
+
     <!-- NuGet Packaging -->
     <IsPackable>false</IsPackable>
     <PackageVersion>$(Version)</PackageVersion>

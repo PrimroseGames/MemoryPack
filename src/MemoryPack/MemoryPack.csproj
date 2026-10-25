@@ -15,7 +15,9 @@
 
     <ItemGroup>
         <ProjectReference Include="..\MemoryPack.Core\MemoryPack.Core.csproj" />
-        <ProjectReference Include="..\MemoryPack.Generator\MemoryPack.Generator.csproj" />
+        <!-- An analyzer, so a project referencing this one gets no Roslyn compile references. -->
+        <ProjectReference Include="..\MemoryPack.Generator\MemoryPack.Generator.csproj"
+                          OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
 </Project>

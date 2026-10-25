@@ -8,6 +8,17 @@ namespace MemoryPack.Compression;
 public struct BrotliDecompressor : IDisposable
 {
     ReusableReadOnlySequenceBuilder? sequenceBuilder;
+    readonly int decompressionSizeLimit;
+    int decompressedLength;
+
+    /// <summary>Creates a decompressor that throws once the data decompresses past <paramref name="decompressionSizeLimit"/> bytes.</summary>
+    public BrotliDecompressor(int decompressionSizeLimit)
+    {
+        if (decompressionSizeLimit <= 0) throw new ArgumentOutOfRangeException(nameof(decompressionSizeLimit), decompressionSizeLimit, "The limit must be positive.");
+        this.sequenceBuilder = null;
+        this.decompressionSizeLimit = decompressionSizeLimit;
+        this.decompressedLength = 0;
+    }
 
     public ReadOnlySequence<byte> Decompress(ReadOnlySpan<byte> compressedSpan)
     {
@@ -100,6 +111,13 @@ public struct BrotliDecompressor : IDisposable
             {
                 MemoryPackSerializationException.ThrowCompressionFailed(status);
             }
+
+            // A default decompressor has no limit.
+            if (decompressionSizeLimit != 0 && bytesWritten > decompressionSizeLimit - decompressedLength)
+            {
+                MemoryPackSerializationException.ThrowDecompressionSizeLimitExceeded(decompressionSizeLimit, (int)Math.Min((long)decompressedLength + bytesWritten, int.MaxValue));
+            }
+            decompressedLength += bytesWritten;
 
             if (status == OperationStatus.NeedMoreData)
             {

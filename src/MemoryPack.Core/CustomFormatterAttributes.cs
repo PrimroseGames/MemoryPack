@@ -70,16 +70,18 @@ public sealed class BrotliFormatterAttribute<T> : MemoryPackCustomFormatterAttri
 {
     public System.IO.Compression.CompressionLevel CompressionLevel { get; }
     public int Window { get; }
+    public int DecompressionSizeLimit { get; }
 
-    public BrotliFormatterAttribute(System.IO.Compression.CompressionLevel compressionLevel = System.IO.Compression.CompressionLevel.Fastest, int window = BrotliUtils.WindowBits_Default)
+    public BrotliFormatterAttribute(System.IO.Compression.CompressionLevel compressionLevel = System.IO.Compression.CompressionLevel.Fastest, int window = BrotliUtils.WindowBits_Default, int decompressionSizeLimit = BrotliFormatter.DefaultDecompssionSizeLimit)
     {
         this.CompressionLevel = compressionLevel;
         this.Window = window;
+        this.DecompressionSizeLimit = decompressionSizeLimit;
     }
 
     public override BrotliFormatter<T> GetFormatter()
     {
-        return new BrotliFormatter<T>(CompressionLevel, Window);
+        return new BrotliFormatter<T>(CompressionLevel, Window, DecompressionSizeLimit);
     }
 }
 

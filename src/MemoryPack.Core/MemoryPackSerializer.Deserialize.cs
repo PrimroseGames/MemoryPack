@@ -160,6 +160,8 @@ public static partial class MemoryPackSerializer
         {
             var buffer = ArrayPool<byte>.Shared.Rent(65536); // initial 64K
             var offset = 0;
+            var buffered = 0L;
+            var maxBuffered = (options ?? MemoryPackSerializerOptions.Default).MaxBufferedStreamLength;
             do
             {
                 if (offset == buffer.Length)
@@ -182,6 +184,13 @@ public static partial class MemoryPackSerializer
                 }
 
                 offset += read;
+                buffered += read;
+                if (buffered > maxBuffered)
+                {
+                    // buffer is not added in builder, so return here.
+                    ArrayPool<byte>.Shared.Return(buffer);
+                    MemoryPackSerializationException.ThrowStreamExceedsBufferLimit(maxBuffered);
+                }
 
                 if (read == 0)
                 {

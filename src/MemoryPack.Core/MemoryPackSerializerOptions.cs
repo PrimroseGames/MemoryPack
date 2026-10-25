@@ -27,6 +27,22 @@
 
         readonly int maxDepth = DefaultMaxDepth;
 
+        /// <summary>
+        /// Most bytes DeserializeAsync buffers from a stream before reading it, which bounds the memory an oversized or
+        /// hostile stream can hold. A MemoryStream whose buffer is exposed is read in place and isn't limited. Defaults to 64 MiB.
+        /// </summary>
+        public long MaxBufferedStreamLength
+        {
+            get => maxBufferedStreamLength;
+            init
+            {
+                if (value <= 0) throw new ArgumentOutOfRangeException(nameof(MaxBufferedStreamLength), value, "MaxBufferedStreamLength must be positive.");
+                maxBufferedStreamLength = value;
+            }
+        }
+
+        readonly long maxBufferedStreamLength = 64 * 1024 * 1024;
+
         internal const int DefaultMaxDepth = 1000;
     }
 

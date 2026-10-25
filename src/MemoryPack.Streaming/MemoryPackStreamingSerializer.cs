@@ -100,8 +100,13 @@ public static class MemoryPackStreamingSerializer
         {
             using var reader = new MemoryPackReader(buffer, state);
 
-            // allow to use `Dangerous` read header.
-            return reader.DangerousTryReadCollectionHeader(out length);
+            // The items are still to arrive, so the count can't be checked against the data; it can only be a count.
+            var isNotNull = reader.DangerousTryReadCollectionHeader(out length);
+            if (length < MemoryPackCode.NullCollection)
+            {
+                MemoryPackSerializationException.ThrowInvalidLength(length);
+            }
+            return isNotNull;
         }
 
         static int Deserialize(in ReadOnlySequence<byte> buffer, int bufferAtLeast, List<T?> itemBuffer, StrongBox<int> remain, bool bufferIsFull, MemoryPackReaderOptionalState state)

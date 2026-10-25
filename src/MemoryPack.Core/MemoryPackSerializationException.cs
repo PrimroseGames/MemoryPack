@@ -106,6 +106,18 @@ public class MemoryPackSerializationException : Exception
     }
 
     [DoesNotReturn]
+    public static void ThrowStreamExceedsBufferLimit(long limit)
+    {
+        throw new MemoryPackSerializationException($"The stream holds more than MaxBufferedStreamLength, {limit} bytes.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowDeclaredElementsExceedData(int count, long remaining)
+    {
+        throw new MemoryPackSerializationException($"The data declares {count} elements where its length can hold only {remaining} more.");
+    }
+
+    [DoesNotReturn]
     public static void ThrowDeserializeDepthExceeded(int maxDepth)
     {
         throw new MemoryPackSerializationException($"The data nests deeper than MaxDepth, {maxDepth}.");

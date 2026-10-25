@@ -143,6 +143,7 @@ public sealed class BrotliFormatter<T> : MemoryPackFormatter<T>
 
     readonly System.IO.Compression.CompressionLevel compressionLevel;
     readonly int window;
+    readonly int decompressionSizeLimit;
 
     public BrotliFormatter()
         : this(System.IO.Compression.CompressionLevel.Fastest)
@@ -156,9 +157,15 @@ public sealed class BrotliFormatter<T> : MemoryPackFormatter<T>
     }
 
     public BrotliFormatter(System.IO.Compression.CompressionLevel compressionLevel, int window)
+        : this(compressionLevel, window, DefaultDecompssionSizeLimit)
+    {
+    }
+
+    public BrotliFormatter(System.IO.Compression.CompressionLevel compressionLevel, int window, int decompressionSizeLimit)
     {
         this.compressionLevel = compressionLevel;
         this.window = window;
+        this.decompressionSizeLimit = decompressionSizeLimit;
     }
 
     [Preserve]
@@ -183,7 +190,7 @@ public sealed class BrotliFormatter<T> : MemoryPackFormatter<T>
     [Preserve]
     public override void Deserialize(ref MemoryPackReader reader, scoped ref T? value)
     {
-        using var decompressor = new BrotliDecompressor();
+        using var decompressor = new BrotliDecompressor(decompressionSizeLimit);
 
         reader.GetRemainingSource(out var singleSource, out var remainingSource);
 

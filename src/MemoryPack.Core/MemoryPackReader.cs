@@ -29,6 +29,7 @@ public ref partial struct MemoryPackReader
     byte[]? rentBuffer;
     int advancedCount;
     int consumed;   // total length of consumed
+    long remainingElements; // declared-element budget, counting down from the read's length
     readonly MemoryPackReaderOptionalState optionalState;
 
     public int Consumed => consumed;
@@ -58,6 +59,7 @@ public ref partial struct MemoryPackReader
         this.consumed = 0;
         this.rentBuffer = null;
         this.totalLength = sequence.Length;
+        this.remainingElements = sequence.Length;
         this.optionalState = optionalState;
     }
 
@@ -74,6 +76,7 @@ public ref partial struct MemoryPackReader
         this.consumed = 0;
         this.rentBuffer = null;
         this.totalLength = buffer.Length;
+        this.remainingElements = buffer.Length;
         this.optionalState = optionalState;
     }
 
@@ -312,7 +315,45 @@ public ref partial struct MemoryPackReader
             MemoryPackSerializationException.ThrowInvalidLength(length);
         }
 
+        if (length > 0)
+        {
+            ChargeElementsCore(length);
+        }
+
         return length != MemoryPackCode.NullCollection;
+    }
+
+    /// <summary>
+    /// Accounts for <paramref name="count"/> elements the data declares, before anything is allocated for them.
+    /// Throws unless at least one byte is left per element and the counts declared so far in this read still fit
+    /// in its length. Collection headers read with <see cref="TryReadCollectionHeader"/> are charged already; a
+    /// formatter that reads a count of its own calls this with it.
+    /// </summary>
+    public void ChargeElements(int count)
+    {
+        if (count < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(count);
+        }
+        if (Remaining < count)
+        {
+            MemoryPackSerializationException.ThrowInsufficientBufferUnless(count);
+        }
+        ChargeElementsCore(count);
+    }
+
+    // Every element takes at least one byte of its own (an element nested inside another follows its collection's
+    // header), so the counts every header in a read declares can't sum past the read's length. The check against
+    // Remaining alone can't see this: nested headers all measure the same tail, so each can claim all of it.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    void ChargeElementsCore(int count)
+    {
+        var remaining = remainingElements - count;
+        if (remaining < 0)
+        {
+            MemoryPackSerializationException.ThrowDeclaredElementsExceedData(count, remainingElements);
+        }
+        remainingElements = remaining;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -1098,7 +1098,13 @@ public static class {{initializerName}}
                 var method = (x.Type.TryGetMemoryPackableType(reference, out var genType, out _) && genType is GenerateType.Object or GenerateType.VersionTolerant or GenerateType.CircularReference)
                     ? "WritePackable"
                     : "WriteValue";
-                return $"                    case {x.Tag}: writer.{method}(System.Runtime.CompilerServices.Unsafe.As<{symbolFullQualified}?, {ToUnionTagTypeFullyQualifiedToString(x.Type)}>(ref value)); break;";
+                var memberType = ToUnionTagTypeFullyQualifiedToString(x.Type);
+
+                // A struct member is boxed behind the reference, so it's unboxed; reinterpreting the
+                // reference as the struct would read the pointer as its fields.
+                return x.Type.IsValueType
+                    ? $"                    case {x.Tag}: writer.{method}(({memberType})value); break;"
+                    : $"                    case {x.Tag}: writer.{method}(System.Runtime.CompilerServices.Unsafe.As<{symbolFullQualified}?, {memberType}>(ref value)); break;";
             })
             .NewLine();
 
@@ -1143,6 +1149,25 @@ public static class {{initializerName}}
             var castString = method == "ReadPackable" && symbolFullQualified != tagTypeFullQualified
                 ? $"({tagTypeFullQualified})"
                 : "";
+
+            // A struct member reads into an unboxed copy, which is boxed back; reading through the
+            // reinterpreted reference would write the struct's bytes over the reference.
+            if (x.Type.IsValueType)
+            {
+                return $$"""
+                case {{x.Tag}}:
+                    if (value is {{tagTypeFullQualified}} existing{{x.Tag}})
+                    {
+                        reader.{{method}}(ref existing{{x.Tag}});
+                        value = existing{{x.Tag}};
+                    }
+                    else
+                    {
+                        value = reader.{{method}}<{{tagTypeFullQualified}}>();
+                    }
+                    break;
+""";
+            }
 
             return $$"""
                 case {{x.Tag}}:

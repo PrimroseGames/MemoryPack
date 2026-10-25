@@ -3,7 +3,6 @@ using MemoryPack.Internal;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 
@@ -153,7 +152,7 @@ public static partial class MemoryPackFormatterProvider
             return formatter;
         }
 
-        if (TryInvokeRegisterFormatter(type))
+        if (TryRunRegisteringConstructor(type))
         {
             // try again
             if (formatters.TryGetValue(type, out formatter))
@@ -182,26 +181,20 @@ public static partial class MemoryPackFormatterProvider
         return formatter;
     }
 
-    static bool TryInvokeRegisterFormatter(Type type)
+    // A type implementing IMemoryPackFormatterRegister registers its formatters from its static
+    // constructor (generated types always do), so running that constructor registers them. Nothing
+    // reflects over the type's members, so NativeAOT needs no metadata for it. The generated module
+    // initializer names each type directly, which keeps its constructor; one that is gone registers
+    // nothing and the error formatter says so.
+#if NET5_0_OR_GREATER
+    [UnconditionalSuppressMessage("Trimming", "IL2059", Justification = "Generated module initializers root these constructors.")]
+#endif
+    static bool TryRunRegisteringConstructor(Type type)
     {
-        if (typeof(IMemoryPackFormatterRegister).IsAssignableFrom(type))
-        {
-            // currently C# can not call like `if (T is IMemoryPackFormatterRegister) T.RegisterFormatter()`, so use reflection instead.
-            var m = type.GetMethod("MemoryPack.IMemoryPackFormatterRegister.RegisterFormatter", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-            if (m == null)
-            {
-                // Roslyn3.11 generator generate public static method
-                m = type.GetMethod("RegisterFormatter", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-            }
-            if (m == null)
-            {
-                throw new InvalidOperationException("Type implements IMemoryPackFormatterRegister but can not found RegisterFormatter. Type: " + type.FullName);
-            }
-            m!.Invoke(null, null); // Cache<T>.formatter will set from method
-            return true;
-        }
+        if (!typeof(IMemoryPackFormatterRegister).IsAssignableFrom(type)) return false;
 
-        return false;
+        RuntimeHelpers.RunClassConstructor(type.TypeHandle);
+        return true;
     }
 
     static class Check<T>
@@ -220,9 +213,12 @@ public static partial class MemoryPackFormatterProvider
             try
             {
                 var type = typeof(T);
-                if (TryInvokeRegisterFormatter(type))
+                if (TryRunRegisteringConstructor(type))
                 {
-                    return;
+                    if (Volatile.Read(ref Check<T>.registered)) return;
+
+                    formatter = new ErrorMemoryPackFormatter<T>($"{type.FullName} implements IMemoryPackFormatterRegister, but its static constructor registered no formatter.");
+                    goto END;
                 }
 
                 if (TypeHelpers.IsAnonymous(type))
@@ -231,8 +227,15 @@ public static partial class MemoryPackFormatterProvider
                     goto END;
                 }
 
-                var typeIsReferenceOrContainsReferences = RuntimeHelpers.IsReferenceOrContainsReferences<T>();
-                var f = CreateGenericFormatter(type, typeIsReferenceOrContainsReferences) as MemoryPackFormatter<T>;
+                // Enums and structs without references are copied as they are. Built here, where T is
+                // known, so the formatter needs no runtime generic instantiation.
+                if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+                {
+                    formatter = new DangerousUnmanagedFormatter<T>();
+                    goto END;
+                }
+
+                var f = CreateGenericFormatter(type, typeIsReferenceOrContainsReferences: true) as MemoryPackFormatter<T>;
 
                 formatter = f ?? new ErrorMemoryPackFormatter<T>();
             }
@@ -247,6 +250,16 @@ public static partial class MemoryPackFormatterProvider
         }
     }
 
+    // The fallback for arrays and generic types nothing registered. Under NativeAOT the instantiation
+    // may not exist; then the exception reaches Cache<T>, whose error formatter names the type when
+    // it is used. Register such formatters explicitly to make them AOT-safe.
+#if NET5_0_OR_GREATER
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "Failure is reported through ErrorMemoryPackFormatter.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2055", Justification = "Failure is reported through ErrorMemoryPackFormatter.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2067", Justification = "Formatters keep their parameterless constructors through [Preserve].")]
+    [UnconditionalSuppressMessage("Trimming", "IL2072", Justification = "Formatters keep their parameterless constructors through [Preserve].")]
+    [UnconditionalSuppressMessage("Trimming", "IL2077", Justification = "Formatters keep their parameterless constructors through [Preserve].")]
+#endif
     internal static object? CreateGenericFormatter(Type type, bool typeIsReferenceOrContainsReferences)
     {
         Type? formatterType = null;
@@ -332,6 +345,10 @@ public static partial class MemoryPackFormatterProvider
         return Activator.CreateInstance(formatterType);
     }
 
+#if NET5_0_OR_GREATER
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "See CreateGenericFormatter.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2055", Justification = "See CreateGenericFormatter.")]
+#endif
     static Type? TryCreateGenericFormatterType(Type type, IDictionary<Type, Type> knownTypes)
     {
         if (type.IsGenericType)
@@ -347,6 +364,10 @@ public static partial class MemoryPackFormatterProvider
         return null;
     }
 
+#if NET5_0_OR_GREATER
+    [UnconditionalSuppressMessage("AOT", "IL3050", Justification = "See CreateGenericFormatter.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2055", Justification = "See CreateGenericFormatter.")]
+#endif
     static Type? TryCreateGenericCollectionFormatterType(Type type)
     {
         if (type.IsGenericType && genericCollectionFormatterFactory.TryGetValue(type.GetGenericTypeDefinition(), out var formatterType))

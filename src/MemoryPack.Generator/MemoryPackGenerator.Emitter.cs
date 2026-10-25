@@ -328,8 +328,6 @@ public partial class TypeMeta
         var nullable = IsValueType ? "" : "?";
 
         string staticRegisterFormatterMethod, staticMemoryPackableMethod, scopedRef, constraint, registerBody, registerT;
-        var fixedSizeInterface = "";
-        var fixedSizeMethod = "";
         scopedRef = (context.IsCSharp11OrGreater())
             ? "scoped ref"
             : "ref";
@@ -348,27 +346,6 @@ public partial class TypeMeta
             constraint = "";
             registerBody = $"global::MemoryPack.MemoryPackFormatterProvider.Register(new global::MemoryPack.Formatters.MemoryPackableFormatter<{TypeName}>());";
             registerT = $"global::MemoryPack.MemoryPackFormatterProvider.Register<{TypeName}>();";
-
-            // similar as VersionTolerantOptimized but not includes String, Array
-            var fixedSize = false;
-            if (Members.All(x => x.Kind is MemberKind.Unmanaged or MemberKind.Enum or MemberKind.UnmanagedNullable or MemberKind.Blank))
-            {
-                fixedSize = true;
-            }
-
-            var callbackCount = new[] { this.OnSerializing, this.OnSerialized, this.OnDeserialized, this.OnDeserializing }.Select(x => x.Length).Sum();
-            if (fixedSize && GenerateType == GenerateType.Object && !this.IsValueType && callbackCount == 0)
-            {
-                var sizeOf = string.Join(" + ", Members.Select(x => $"System.Runtime.CompilerServices.Unsafe.SizeOf<{x.MemberType.FullyQualifiedToString()}>()"));
-                var headerPlus = (Members.Length == 0) ? "1" : "1 + ";
-                fixedSizeInterface = ", global::MemoryPack.IFixedSizeMemoryPackable";
-                fixedSizeMethod = $$"""
-
-    [global::MemoryPack.Internal.Preserve]
-    static int global::MemoryPack.IFixedSizeMemoryPackable.Size => {{headerPlus}}{{sizeOf}};
-
-""";
-            }
         }
         var serializeMethodSignarture = context.IsForUnity
             ? "Serialize(ref MemoryPackWriter"
@@ -381,7 +358,7 @@ public partial class TypeMeta
         }
 
         writer.AppendLine($$"""
-partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{fixedSizeInterface}}
+partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>
 {
 {{EmitCustomFormatters()}}
     static partial void StaticConstructor();
@@ -391,7 +368,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>{{
         {{registerT}}
         StaticConstructor();
     }
-{{fixedSizeMethod}}
+
     [global::MemoryPack.Internal.Preserve]
     {{staticRegisterFormatterMethod}}RegisterFormatter()
     {
@@ -632,16 +609,65 @@ partial {{classOrStructOrRecord}} {{TypeName}}
         return sb.ToString();
     }
 
+    // Builds each custom-formatter attribute the way reading it back would (constructor arguments,
+    // then named properties and fields), but in code, so no member metadata is needed at runtime.
     string EmitCustomFormatters()
     {
         var sb = new StringBuilder();
         foreach (var item in Members.Where(x => x.Kind == MemberKind.CustomFormatter))
         {
-            var fieldOrProp = item.IsField ? "Field" : "Property";
+            var attribute = item.CustomFormatterAttribute!;
+            var args = string.Join(", ", attribute.ConstructorArguments.Select(ToCSharpExpression));
+            var named = attribute.NamedArguments.Length == 0
+                ? ""
+                : " { " + string.Join(", ", attribute.NamedArguments.Select(x => $"{x.Key} = {ToCSharpExpression(x.Value)}")) + " }";
 
-            sb.AppendLine($"    static readonly {item.CustomFormatterName} __{item.Name}Formatter = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<{item.CustomFormatter!.FullyQualifiedToString()}>(typeof({this.Symbol.FullyQualifiedToString()}).Get{fieldOrProp}(\"{item.Name}\", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)).GetFormatter();");
+            sb.AppendLine($"    static readonly {item.CustomFormatterName} __{item.Name}Formatter = new {item.CustomFormatter!.FullyQualifiedToString()}({args}){named}.GetFormatter();");
         }
         return sb.ToString();
+    }
+
+    static string ToCSharpExpression(TypedConstant constant)
+    {
+        var type = constant.Type?.FullyQualifiedToString() ?? "object";
+
+        if (constant.IsNull)
+        {
+            return $"default({type})";
+        }
+
+        switch (constant.Kind)
+        {
+            case TypedConstantKind.Array:
+                var elementType = (constant.Type as IArrayTypeSymbol)?.ElementType.FullyQualifiedToString() ?? "object";
+                return $"new {elementType}[] {{ {string.Join(", ", constant.Values.Select(ToCSharpExpression))} }}";
+            case TypedConstantKind.Type:
+                return $"typeof({((ITypeSymbol)constant.Value!).FullyQualifiedToString()})";
+            case TypedConstantKind.Enum:
+                return $"({type})({SymbolDisplay.FormatPrimitive(constant.Value!, quoteStrings: false, useHexadecimalNumbers: false)})";
+            case TypedConstantKind.Primitive:
+                switch (constant.Value)
+                {
+                    case string s:
+                        return SymbolDisplay.FormatLiteral(s, quote: true);
+                    case char c:
+                        return SymbolDisplay.FormatLiteral(c, quote: true);
+                    case bool b:
+                        return b ? "true" : "false";
+                    case float f when float.IsNaN(f) || float.IsInfinity(f):
+                        return float.IsNaN(f) ? "float.NaN" : f > 0 ? "float.PositiveInfinity" : "float.NegativeInfinity";
+                    case double d when double.IsNaN(d) || double.IsInfinity(d):
+                        return double.IsNaN(d) ? "double.NaN" : d > 0 ? "double.PositiveInfinity" : "double.NegativeInfinity";
+                    case float f:
+                        return $"({type})({f.ToString("R", System.Globalization.CultureInfo.InvariantCulture)})";
+                    case double d:
+                        return $"({type})({d.ToString("R", System.Globalization.CultureInfo.InvariantCulture)})";
+                    default:
+                        return $"({type})({SymbolDisplay.FormatPrimitive(constant.Value!, quoteStrings: false, useHexadecimalNumbers: false)})";
+                }
+            default:
+                return $"default({type})";
+        }
     }
 
     string EmitSerializeBody(bool isForUnity)

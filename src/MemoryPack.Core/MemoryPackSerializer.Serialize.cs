@@ -27,44 +27,6 @@ public static partial class MemoryPackSerializer
             Unsafe.WriteUnaligned(ref GetArrayDataReference(array), value);
             return array;
         }
-#if NET7_0_OR_GREATER
-        var typeKind = TypeHelpers.TryGetUnmanagedSZArrayElementSizeOrMemoryPackableFixedSize<T>(out var elementSize);
-        if (typeKind == TypeHelpers.TypeKind.None)
-        {
-            // do nothing
-        }
-        else if (typeKind == TypeHelpers.TypeKind.UnmanagedSZArray)
-        {
-            if (value == null)
-            {
-                return MemoryPackCode.NullCollectionData.ToArray();
-            }
-
-            var srcArray = ((Array)(object)value!);
-            var length = srcArray.Length;
-            if (length == 0)
-            {
-                return new byte[4] { 0, 0, 0, 0 };
-            }
-
-            var dataSize = elementSize * length;
-            var destArray = AllocateUninitializedArray<byte>(dataSize + 4);
-            ref var head = ref MemoryMarshal.GetArrayDataReference(destArray);
-
-            Unsafe.WriteUnaligned(ref head, length);
-            Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref head, 4), ref MemoryMarshal.GetArrayDataReference(srcArray), (uint)dataSize);
-
-            return destArray;
-        }
-        else if (typeKind == TypeHelpers.TypeKind.FixedSizeMemoryPackable)
-        {
-            var buffer = new byte[(value == null) ? 1 : elementSize];
-            var bufferWriter = new FixedArrayBufferWriter(buffer);
-            var writer = new MemoryPackWriter<FixedArrayBufferWriter>(ref bufferWriter, buffer, MemoryPackWriterOptionalState.NullState);
-            Serialize(ref writer, value);
-            return bufferWriter.GetFilledBuffer();
-        }
-#endif
 
         var state = threadStaticState;
         if (state == null)
@@ -100,39 +62,6 @@ public static partial class MemoryPackSerializer
             bufferWriterRef.Advance(Unsafe.SizeOf<T>());
             return;
         }
-#if NET7_0_OR_GREATER
-        var typeKind = TypeHelpers.TryGetUnmanagedSZArrayElementSizeOrMemoryPackableFixedSize<T>(out var elementSize);
-        if (typeKind == TypeHelpers.TypeKind.UnmanagedSZArray)
-        {
-            if (value == null)
-            {
-                var span = bufferWriterRef.GetSpan(4);
-                MemoryPackCode.NullCollectionData.CopyTo(span);
-                bufferWriterRef.Advance(4);
-                return;
-            }
-
-            var srcArray = ((Array)(object)value!);
-            var length = srcArray.Length;
-            if (length == 0)
-            {
-                var span = bufferWriterRef.GetSpan(4);
-                MemoryPackCode.ZeroCollectionData.CopyTo(span);
-                bufferWriterRef.Advance(4);
-                return;
-            }
-
-            var dataSize = elementSize * length;
-            var destSpan = bufferWriterRef.GetSpan(dataSize + 4);
-            ref var head = ref MemoryMarshal.GetReference(destSpan);
-
-            Unsafe.WriteUnaligned(ref head, length);
-            Unsafe.CopyBlockUnaligned(ref Unsafe.Add(ref head, 4), ref MemoryMarshal.GetArrayDataReference(srcArray), (uint)dataSize);
-
-            bufferWriterRef.Advance(dataSize + 4);
-            return;
-        }
-#endif
 
         var state = threadStaticWriterOptionalState;
         if (state == null)

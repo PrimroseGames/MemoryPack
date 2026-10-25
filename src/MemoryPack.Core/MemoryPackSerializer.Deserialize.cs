@@ -1,6 +1,5 @@
 ﻿using MemoryPack.Internal;
 using System.Buffers;
-using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -11,22 +10,14 @@ public static partial class MemoryPackSerializer
     [ThreadStatic]
     static MemoryPackReaderOptionalState? threadStaticReaderOptionalState;
 
-    public static T? Deserialize<
-#if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-#endif
-        T>(ReadOnlySpan<byte> buffer, MemoryPackSerializerOptions? options = default)
+    public static T? Deserialize<T>(ReadOnlySpan<byte> buffer, MemoryPackSerializerOptions? options = default)
     {
         T? value = default;
         Deserialize(buffer, ref value, options);
         return value;
     }
 
-    public static int Deserialize<
-#if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-#endif
-        T>(ReadOnlySpan<byte> buffer, ref T? value, MemoryPackSerializerOptions? options = default)
+    public static int Deserialize<T>(ReadOnlySpan<byte> buffer, ref T? value, MemoryPackSerializerOptions? options = default)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
@@ -58,22 +49,14 @@ public static partial class MemoryPackSerializer
         }
     }
 
-    public static T? Deserialize<
-#if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-#endif
-        T>(in ReadOnlySequence<byte> buffer, MemoryPackSerializerOptions? options = default)
+    public static T? Deserialize<T>(in ReadOnlySequence<byte> buffer, MemoryPackSerializerOptions? options = default)
     {
         T? value = default;
         Deserialize<T>(buffer, ref value, options);
         return value;
     }
 
-    public static int Deserialize<
-#if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-#endif
-        T>(in ReadOnlySequence<byte> buffer, ref T? value, MemoryPackSerializerOptions? options = default)
+    public static int Deserialize<T>(in ReadOnlySequence<byte> buffer, ref T? value, MemoryPackSerializerOptions? options = default)
     {
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
@@ -140,11 +123,7 @@ public static partial class MemoryPackSerializer
         }
     }
 
-    public static async ValueTask<T?> DeserializeAsync<
-#if NET5_0_OR_GREATER
-        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
-#endif
-        T>(Stream stream, MemoryPackSerializerOptions? options = default, CancellationToken cancellationToken = default)
+    public static async ValueTask<T?> DeserializeAsync<T>(Stream stream, MemoryPackSerializerOptions? options = default, CancellationToken cancellationToken = default)
     {
         if (stream is MemoryStream ms && ms.TryGetBuffer(out ArraySegment<byte> streamBuffer))
         {

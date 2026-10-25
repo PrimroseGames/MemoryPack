@@ -24,6 +24,13 @@ public class WireGoldenTest
     [Fact] public void CircularReference() => Check(nameof(CircularReference), GoldenData.Circular());
     [Fact] public void Unusual() => Check(nameof(Unusual), GoldenData.Unusual());
 
+    // Top-level arrays of unmanaged elements, and an empty and a null one.
+    [Fact] public void TopLevelIntArray() => Check(nameof(TopLevelIntArray), new[] { 3, -4, int.MaxValue });
+    [Fact] public void TopLevelStructArray() => Check(nameof(TopLevelStructArray), new[] { new GoldenPoint { X = 1, Y = -2.5f, Z = true }, new GoldenPoint { X = 7, Y = 0, Z = false } });
+    [Fact] public void TopLevelEmptyArray() => Check(nameof(TopLevelEmptyArray), Array.Empty<long>());
+    [Fact] public void TopLevelNullArray() => Check<short[]?>(nameof(TopLevelNullArray), null);
+    [Fact] public void TopLevelPackableArray() => Check(nameof(TopLevelPackableArray), new[] { new GoldenLeaf { Id = 9, Name = "nine" }, null });
+
     // Brotli output depends on the runtime's encoder, so only the read side is pinned.
     [Fact]
     public void BrotliRead()

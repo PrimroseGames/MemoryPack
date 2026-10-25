@@ -616,6 +616,7 @@ partial class MemberMeta
     public string Name { get; }
     public ITypeSymbol MemberType { get; }
     public INamedTypeSymbol? CustomFormatter { get; }
+    public AttributeData? CustomFormatterAttribute { get; }
     public string? CustomFormatterName { get; }
     public bool IsField { get; }
     public bool IsProperty { get; }
@@ -707,6 +708,7 @@ partial class MemberMeta
             if (customFormatterAttr != null)
             {
                 CustomFormatter = customFormatterAttr.AttributeClass!;
+                CustomFormatterAttribute = customFormatterAttr;
                 Kind = MemberKind.CustomFormatter;
 
                 string formatterName;

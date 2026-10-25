@@ -10,6 +10,36 @@ public static partial class MemoryPackSerializer
     [ThreadStatic]
     static MemoryPackReaderOptionalState? threadStaticReaderOptionalState;
 
+    // The thread's state, or a pooled one when a formatter reads again while the thread's state is still reading:
+    // sharing it would clear the outer read's options and references when the inner one finished.
+    static MemoryPackReaderOptionalState BeginReaderState(MemoryPackSerializerOptions? options)
+    {
+        var state = threadStaticReaderOptionalState ??= new MemoryPackReaderOptionalState();
+        if (state.IsReading)
+        {
+            state = MemoryPackReaderOptionalStatePool.Rent(options);
+        }
+        else
+        {
+            state.Init(options);
+        }
+        state.BeginRead();
+        return state;
+    }
+
+    static void EndReaderState(MemoryPackReaderOptionalState state)
+    {
+        state.EndRead();
+        if (state.pooled)
+        {
+            MemoryPackReaderOptionalStatePool.Return(state);
+        }
+        else
+        {
+            state.Reset();
+        }
+    }
+
     public static T? Deserialize<T>(ReadOnlySpan<byte> buffer, MemoryPackSerializerOptions? options = default)
     {
         T? value = default;
@@ -29,13 +59,7 @@ public static partial class MemoryPackSerializer
             return Unsafe.SizeOf<T>();
         }
 
-        var state = threadStaticReaderOptionalState;
-        if (state == null)
-        {
-            state = threadStaticReaderOptionalState = new MemoryPackReaderOptionalState();
-        }
-        state.Init(options);
-
+        var state = BeginReaderState(options);
         var reader = new MemoryPackReader(buffer, state);
         try
         {
@@ -45,7 +69,7 @@ public static partial class MemoryPackSerializer
         finally
         {
             reader.Dispose();
-            state.Reset();
+            EndReaderState(state);
         }
     }
 
@@ -103,13 +127,7 @@ public static partial class MemoryPackSerializer
             }
         }
 
-        var state = threadStaticReaderOptionalState;
-        if (state == null)
-        {
-            state = threadStaticReaderOptionalState = new MemoryPackReaderOptionalState();
-        }
-        state.Init(options);
-
+        var state = BeginReaderState(options);
         var reader = new MemoryPackReader(buffer, state);
         try
         {
@@ -119,7 +137,7 @@ public static partial class MemoryPackSerializer
         finally
         {
             reader.Dispose();
-            state.Reset();
+            EndReaderState(state);
         }
     }
 

@@ -36,6 +36,14 @@ public ref partial struct MemoryPackReader
     public MemoryPackReaderOptionalState OptionalState => optionalState;
     public MemoryPackSerializerOptions Options => optionalState.Options;
 
+    /// <inheritdoc cref="MemoryPackReaderOptionalState.EnterDepth"/>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void EnterDepth() => optionalState.EnterDepth();
+
+    /// <inheritdoc cref="MemoryPackReaderOptionalState.ExitDepth"/>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void ExitDepth() => optionalState.ExitDepth();
+
     public MemoryPackReader(in ReadOnlySequence<byte> sequence, MemoryPackReaderOptionalState optionalState)
     {
         this.bufferSource = sequence.IsSingleSegment ? ReadOnlySequence<byte>.Empty : sequence;

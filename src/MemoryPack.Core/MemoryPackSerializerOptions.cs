@@ -10,6 +10,24 @@
 
         public StringEncoding StringEncoding { get; init; }
         public IServiceProvider? ServiceProvider { get; init; }
+
+        /// <summary>
+        /// Deepest nesting of objects a read accepts; zero means unlimited, though running out of stack still throws.
+        /// The default matches the writer's own limit, so anything MemoryPack wrote reads back.
+        /// </summary>
+        public int MaxDepth
+        {
+            get => maxDepth;
+            init
+            {
+                if (value < 0) throw new ArgumentOutOfRangeException(nameof(MaxDepth), value, "MaxDepth can't be negative.");
+                maxDepth = value;
+            }
+        }
+
+        readonly int maxDepth = DefaultMaxDepth;
+
+        internal const int DefaultMaxDepth = 1000;
     }
 
     public enum StringEncoding : byte

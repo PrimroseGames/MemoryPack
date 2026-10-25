@@ -114,13 +114,7 @@ public static partial class MemoryPackSerializer
 
     public static int Deserialize(Type type, ReadOnlySpan<byte> buffer, ref object? value, MemoryPackSerializerOptions? options = default)
     {
-        var state = threadStaticReaderOptionalState;
-        if (state == null)
-        {
-            state = threadStaticReaderOptionalState = new MemoryPackReaderOptionalState();
-        }
-        state.Init(options);
-
+        var state = BeginReaderState(options);
         var reader = new MemoryPackReader(buffer, state);
         try
         {
@@ -130,7 +124,7 @@ public static partial class MemoryPackSerializer
         finally
         {
             reader.Dispose();
-            state.Reset();
+            EndReaderState(state);
         }
     }
 
@@ -143,13 +137,7 @@ public static partial class MemoryPackSerializer
 
     public static int Deserialize(Type type, in ReadOnlySequence<byte> buffer, ref object? value, MemoryPackSerializerOptions? options = default)
     {
-        var state = threadStaticReaderOptionalState;
-        if (state == null)
-        {
-            state = threadStaticReaderOptionalState = new MemoryPackReaderOptionalState();
-        }
-        state.Init(options);
-
+        var state = BeginReaderState(options);
         var reader = new MemoryPackReader(buffer, state);
         try
         {
@@ -159,7 +147,7 @@ public static partial class MemoryPackSerializer
         finally
         {
             reader.Dispose();
-            state.Reset();
+            EndReaderState(state);
         }
     }
 

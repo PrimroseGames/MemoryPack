@@ -22,7 +22,7 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
     where TBufferWriter : class, IBufferWriter<byte>
 #endif
 {
-    const int DepthLimit = 1000;
+    const int DepthLimit = MemoryPackSerializerOptions.DefaultMaxDepth;
 
 #if NET7_0_OR_GREATER
     ref TBufferWriter bufferWriter;

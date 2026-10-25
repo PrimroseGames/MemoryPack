@@ -106,6 +106,18 @@ public class MemoryPackSerializationException : Exception
     }
 
     [DoesNotReturn]
+    public static void ThrowDeserializeDepthExceeded(int maxDepth)
+    {
+        throw new MemoryPackSerializationException($"The data nests deeper than MaxDepth, {maxDepth}.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowInsufficientStack()
+    {
+        throw new MemoryPackSerializationException("The data nests too deep for the stack left on this thread.");
+    }
+
+    [DoesNotReturn]
     public static void ThrowInvalidConcurrrentCollectionOperation()
     {
         throw new MemoryPackSerializationException($"ConcurrentCollection is Added/Removed in serializing, however serialize concurrent collection is not thread-safe.");

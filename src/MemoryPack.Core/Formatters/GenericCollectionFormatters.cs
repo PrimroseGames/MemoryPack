@@ -37,6 +37,8 @@ public sealed class GenericCollectionFormatter<TCollection, TElement> : MemoryPa
 
         var formatter = reader.GetFormatter<TElement?>();
 
+        // A collection type can hold itself, so it nests without passing through a generated object.
+        reader.EnterDepth();
         var collection = new TCollection();
         for (int i = 0; i < length; i++)
         {
@@ -44,6 +46,7 @@ public sealed class GenericCollectionFormatter<TCollection, TElement> : MemoryPa
             formatter.Deserialize(ref reader, ref v);
             collection.Add(v);
         }
+        reader.ExitDepth();
 
         value = collection;
     }
@@ -86,6 +89,7 @@ public abstract class GenericSetFormatterBase<TSet, TElement> : MemoryPackFormat
 
         var formatter = reader.GetFormatter<TElement?>();
 
+        reader.EnterDepth();
         var collection = CreateSet();
         for (int i = 0; i < length; i++)
         {
@@ -93,6 +97,7 @@ public abstract class GenericSetFormatterBase<TSet, TElement> : MemoryPackFormat
             formatter.Deserialize(ref reader, ref v);
             collection.Add(v);
         }
+        reader.ExitDepth();
 
         value = collection;
     }
@@ -147,12 +152,14 @@ public abstract class GenericDictionaryFormatterBase<TDictionary, TKey, TValue> 
         var keyFormatter = reader.GetFormatter<TKey>();
         var valueFormatter = reader.GetFormatter<TValue>();
 
+        reader.EnterDepth();
         var dict = CreateDictionary();
         for (int i = 0; i < length; i++)
         {
             KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
             dict.Add(k!, v);
         }
+        reader.ExitDepth();
 
         value = dict;
     }

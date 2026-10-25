@@ -327,6 +327,10 @@ public partial class TypeMeta
 
         var nullable = IsValueType ? "" : "?";
 
+        // Each object read is one level of nesting; an unmanaged value holds no further reads.
+        var enterDepth = IsUnmanagedType ? "" : "        reader.EnterDepth();";
+        var exitDepth = IsUnmanagedType ? "" : "        reader.ExitDepth();";
+
         string staticRegisterFormatterMethod, staticMemoryPackableMethod, scopedRef, constraint, registerBody, registerT;
         scopedRef = (context.IsCSharp11OrGreater())
             ? "scoped ref"
@@ -396,10 +400,12 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>
     [global::MemoryPack.Internal.Preserve]
     {{staticMemoryPackableMethod}}Deserialize(ref MemoryPackReader reader, {{scopedRef}} {{TypeName}}{{nullable}} value)
     {
+{{enterDepth}}
 {{OnDeserializing.Select(x => "        " + x.Emit()).NewLine()}}
 {{deserializeBody}}
     END:
 {{OnDeserialized.Select(x => "        " + x.Emit()).NewLine()}}
+{{exitDepth}}
         return;
     }
 }

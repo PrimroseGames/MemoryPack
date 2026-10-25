@@ -758,6 +758,7 @@ public ref partial struct MemoryPackReader
         var dest = AllocateUninitializedArray<T>(length);
         Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref GetArrayDataReference(dest)), ref src, (uint)byteCount);
         Advance(byteCount);
+        UnmanagedValidator<T>.Run(dest);
 
         return dest;
     }
@@ -789,6 +790,7 @@ public ref partial struct MemoryPackReader
         Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
 
         Advance(byteCount);
+        UnmanagedValidator<T>.Run(value);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -818,6 +820,7 @@ public ref partial struct MemoryPackReader
         Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
 
         Advance(byteCount);
+        UnmanagedValidator<T>.Run(value);
     }
 
     #endregion
@@ -849,6 +852,7 @@ public ref partial struct MemoryPackReader
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
 
             Advance(byteCount);
+            UnmanagedValidator<T?>.Run(value);
         }
         else
         {
@@ -893,6 +897,7 @@ public ref partial struct MemoryPackReader
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
 
             Advance(byteCount);
+            UnmanagedValidator<T?>.Run(value);
         }
         else
         {

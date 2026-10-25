@@ -4,7 +4,13 @@
         <TargetFramework>net11.0</TargetFramework>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <!-- Every test type checks its raw-copied enums and bools, so the whole suite runs with it. -->
+        <MemoryPackGenerator_ValidateEnumsAndBools>true</MemoryPackGenerator_ValidateEnumsAndBools>
     </PropertyGroup>
+
+    <ItemGroup>
+        <CompilerVisibleProperty Include="MemoryPackGenerator_ValidateEnumsAndBools" />
+    </ItemGroup>
 
     <ItemGroup>
         <PackageReference Include="FluentAssertions" Version="6.7.0" />

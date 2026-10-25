@@ -8,8 +8,10 @@ namespace MemoryPack.Generator;
 
 partial class MemoryPackGenerator
 {
-    static void Generate(TypeDeclarationSyntax syntax, Compilation compilation, string? serializationInfoLogDirectoryPath, IGeneratorContext context)
+    static void Generate(TypeDeclarationSyntax syntax, Compilation compilation, GenerateOptions options, IGeneratorContext context)
     {
+        var serializationInfoLogDirectoryPath = options.SerializationInfoLogDirectoryPath;
+
         var semanticModel = compilation.GetSemanticModel(syntax.SyntaxTree);
 
         var typeSymbol = semanticModel.GetDeclaredSymbol(syntax, context.CancellationToken);
@@ -43,7 +45,7 @@ partial class MemoryPackGenerator
         }
         var unionFormatter = (unionSymbol != null);
 
-        var typeMeta = new TypeMeta(typeSymbol, reference);
+        var typeMeta = new TypeMeta(typeSymbol, reference) { ValidateEnumsAndBools = options.ValidateEnumsAndBools };
         if (unionFormatter)
         {
             // replace original symbol
@@ -264,6 +266,7 @@ public partial class TypeMeta
 """;
             deserializeBody = $$"""
         reader.ReadUnmanaged(out value);
+{{EmitValidateSelf("        ")}}
 """;
         }
         else
@@ -336,6 +339,7 @@ public partial class TypeMeta
 partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>
 {
 {{EmitCustomFormatters()}}
+{{EmitValidatorMethods()}}
     static partial void StaticConstructor();
 
     static {{Symbol.Name}}()
@@ -356,6 +360,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>
             global::MemoryPack.MemoryPackFormatterProvider.Register(new global::MemoryPack.Formatters.ArrayFormatter<{{TypeName}}>());
         }
 {{EmitAdditionalRegisterFormatter("        ")}}
+{{EmitValidationRegistrations("        ")}}
     }
 
     [global::MemoryPack.Internal.Preserve]
@@ -505,11 +510,13 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>
         }
 
     SET:
+{{(IsUseEmptyConstructor ? EmitValidateMembers("        ") : "")}}
         {{(!IsUseEmptyConstructor ? "goto NEW;" : "")}}
 {{Members.Where(x => x.IsAssignable).Select(x => $"        {(IsUseEmptyConstructor ? "" : "// ")}value.@{x.Name} = __{x.Name};").NewLine()}}
         goto READ_END;
 
     NEW:
+{{EmitValidateMembers("        ")}}
         value = {{EmitConstructor()}}
         {
 {{EmitDeserializeConstruction("            ")}}

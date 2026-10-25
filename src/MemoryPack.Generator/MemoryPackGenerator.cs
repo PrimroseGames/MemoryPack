@@ -46,16 +46,19 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
 
     void RegisterMemoryPackable(IncrementalGeneratorInitializationContext context)
     {
-        // return dir of info output or null .
+        // The info output directory (or null) and whether raw-copied enums and bools are checked.
         var logProvider = context.AnalyzerConfigOptionsProvider
             .Select((configOptions, token) =>
             {
-                if (configOptions.GlobalOptions.TryGetValue("build_property.MemoryPackGenerator_SerializationInfoOutputDirectory", out var path))
+                if (!configOptions.GlobalOptions.TryGetValue("build_property.MemoryPackGenerator_SerializationInfoOutputDirectory", out var path))
                 {
-                    return path;
+                    path = null;
                 }
 
-                return (string?)null;
+                var validate = configOptions.GlobalOptions.TryGetValue("build_property.MemoryPackGenerator_ValidateEnumsAndBools", out var text)
+                               && bool.TryParse(text, out var parsed) && parsed;
+
+                return new GenerateOptions(path, validate);
             })
             .WithTrackingName("MemoryPack.MemoryPackable.0_AnalyzerConfigOptionsProvider"); // annotate for IncrementalGeneratorTest
 
@@ -97,9 +100,8 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
             context.RegisterSourceOutput(source, static (context, source) =>
             {
                 var (typeDeclaration, compilation) = source.Left;
-                var logPath = source.Right;
 
-                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context));
+                Generate(typeDeclaration, compilation, source.Right, new GeneratorContext(context));
             });
         }
         {
@@ -138,12 +140,13 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
             context.RegisterSourceOutput(source, static (context, source) =>
             {
                 var (typeDeclaration, compilation) = source.Left;
-                var logPath = source.Right;
 
-                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context));
+                Generate(typeDeclaration, compilation, source.Right, new GeneratorContext(context));
             });
         }
     }
+
+    record GenerateOptions(string? SerializationInfoLogDirectoryPath, bool ValidateEnumsAndBools);
 
     // The fully qualified name of a type the module initializer can name: not generic, not nested in a
     // generic type, not file-local, and visible to other types in its assembly. Others still register

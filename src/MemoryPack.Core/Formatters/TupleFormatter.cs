@@ -368,6 +368,7 @@ public sealed class ValueTupleFormatter<T1> : MemoryPackFormatter<ValueTuple<T1?
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?>>())
         {
             reader.DangerousReadUnmanaged(out value);
+            UnmanagedValidator<T1?>.Run(ref value.Item1);
             return;
         }
 
@@ -399,6 +400,8 @@ public sealed class ValueTupleFormatter<T1, T2> : MemoryPackFormatter<ValueTuple
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?>>())
         {
             reader.DangerousReadUnmanaged(out value);
+            UnmanagedValidator<T1?>.Run(ref value.Item1);
+            UnmanagedValidator<T2?>.Run(ref value.Item2);
             return;
         }
 
@@ -432,6 +435,9 @@ public sealed class ValueTupleFormatter<T1, T2, T3> : MemoryPackFormatter<ValueT
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?>>())
         {
             reader.DangerousReadUnmanaged(out value);
+            UnmanagedValidator<T1?>.Run(ref value.Item1);
+            UnmanagedValidator<T2?>.Run(ref value.Item2);
+            UnmanagedValidator<T3?>.Run(ref value.Item3);
             return;
         }
 
@@ -467,6 +473,10 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4> : MemoryPackFormatter<Va
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?>>())
         {
             reader.DangerousReadUnmanaged(out value);
+            UnmanagedValidator<T1?>.Run(ref value.Item1);
+            UnmanagedValidator<T2?>.Run(ref value.Item2);
+            UnmanagedValidator<T3?>.Run(ref value.Item3);
+            UnmanagedValidator<T4?>.Run(ref value.Item4);
             return;
         }
 
@@ -504,6 +514,11 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5> : MemoryPackFormatte
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?>>())
         {
             reader.DangerousReadUnmanaged(out value);
+            UnmanagedValidator<T1?>.Run(ref value.Item1);
+            UnmanagedValidator<T2?>.Run(ref value.Item2);
+            UnmanagedValidator<T3?>.Run(ref value.Item3);
+            UnmanagedValidator<T4?>.Run(ref value.Item4);
+            UnmanagedValidator<T5?>.Run(ref value.Item5);
             return;
         }
 
@@ -543,6 +558,12 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6> : MemoryPackForm
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?>>())
         {
             reader.DangerousReadUnmanaged(out value);
+            UnmanagedValidator<T1?>.Run(ref value.Item1);
+            UnmanagedValidator<T2?>.Run(ref value.Item2);
+            UnmanagedValidator<T3?>.Run(ref value.Item3);
+            UnmanagedValidator<T4?>.Run(ref value.Item4);
+            UnmanagedValidator<T5?>.Run(ref value.Item5);
+            UnmanagedValidator<T6?>.Run(ref value.Item6);
             return;
         }
 
@@ -584,6 +605,13 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6, T7> : MemoryPack
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?>>())
         {
             reader.DangerousReadUnmanaged(out value);
+            UnmanagedValidator<T1?>.Run(ref value.Item1);
+            UnmanagedValidator<T2?>.Run(ref value.Item2);
+            UnmanagedValidator<T3?>.Run(ref value.Item3);
+            UnmanagedValidator<T4?>.Run(ref value.Item4);
+            UnmanagedValidator<T5?>.Run(ref value.Item5);
+            UnmanagedValidator<T6?>.Run(ref value.Item6);
+            UnmanagedValidator<T7?>.Run(ref value.Item7);
             return;
         }
 
@@ -628,6 +656,14 @@ public sealed class ValueTupleFormatter<T1, T2, T3, T4, T5, T6, T7, TRest> : Mem
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<T1?, T2?, T3?, T4?, T5?, T6?, T7?, TRest>>())
         {
             reader.DangerousReadUnmanaged(out value);
+            UnmanagedValidator<T1?>.Run(ref value.Item1);
+            UnmanagedValidator<T2?>.Run(ref value.Item2);
+            UnmanagedValidator<T3?>.Run(ref value.Item3);
+            UnmanagedValidator<T4?>.Run(ref value.Item4);
+            UnmanagedValidator<T5?>.Run(ref value.Item5);
+            UnmanagedValidator<T6?>.Run(ref value.Item6);
+            UnmanagedValidator<T7?>.Run(ref value.Item7);
+            UnmanagedValidator<TRest>.Run(ref value.Rest);
             return;
         }
 

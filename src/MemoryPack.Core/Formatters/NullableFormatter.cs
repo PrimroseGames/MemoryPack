@@ -38,6 +38,7 @@ public sealed class NullableFormatter<T> : MemoryPackFormatter<T?>
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
             reader.DangerousReadUnmanaged(out value);
+            MemoryPackValidation.RunNullable(ref value);
             return;
         }
 

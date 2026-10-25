@@ -118,6 +118,18 @@ public class MemoryPackSerializationException : Exception
     }
 
     [DoesNotReturn]
+    public static void ThrowUndefinedEnumValue(Type enumType, long value)
+    {
+        throw new MemoryPackSerializationException($"{enumType.FullName} declares no member with the value {value}.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowNonCanonicalBool(string member)
+    {
+        throw new MemoryPackSerializationException($"{member} holds a bool other than 0 or 1, and it can't be set to normalize it.");
+    }
+
+    [DoesNotReturn]
     public static void ThrowDeserializeDepthExceeded(int maxDepth)
     {
         throw new MemoryPackSerializationException($"The data nests deeper than MaxDepth, {maxDepth}.");

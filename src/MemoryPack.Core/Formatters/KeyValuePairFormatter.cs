@@ -34,6 +34,8 @@ public static class KeyValuePairFormatter
             reader.DangerousReadUnmanaged(out KeyValuePair<TKey?, TValue?> kvp);
             key = kvp.Key;
             value = kvp.Value;
+            UnmanagedValidator<TKey?>.Run(ref key);
+            UnmanagedValidator<TValue?>.Run(ref value);
             return;
         }
 
@@ -66,6 +68,15 @@ public sealed class KeyValuePairFormatter<TKey, TValue> : MemoryPackFormatter<Ke
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<KeyValuePair<TKey?, TValue?>>())
         {
             reader.DangerousReadUnmanaged(out value);
+            if (UnmanagedValidator<TKey?>.IsRegistered || UnmanagedValidator<TValue?>.IsRegistered)
+            {
+                // The pair's fields are private, so check copies and rebuild it.
+                var k = value.Key;
+                var v = value.Value;
+                UnmanagedValidator<TKey?>.Run(ref k);
+                UnmanagedValidator<TValue?>.Run(ref v);
+                value = new KeyValuePair<TKey?, TValue?>(k, v);
+            }
             return;
         }
 

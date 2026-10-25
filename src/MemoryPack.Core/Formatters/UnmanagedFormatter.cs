@@ -25,6 +25,7 @@ where T : unmanaged
     {
         value = Unsafe.ReadUnaligned<T>(ref reader.GetSpanReference(Unsafe.SizeOf<T>()));
         reader.Advance(Unsafe.SizeOf<T>());
+        UnmanagedValidator<T>.Run(ref value);
     }
 }
 
@@ -43,5 +44,6 @@ public sealed class DangerousUnmanagedFormatter<T> : MemoryPackFormatter<T>
     {
         value = Unsafe.ReadUnaligned<T>(ref reader.GetSpanReference(Unsafe.SizeOf<T>()));
         reader.Advance(Unsafe.SizeOf<T>());
+        UnmanagedValidator<T?>.Run(ref value);
     }
 }

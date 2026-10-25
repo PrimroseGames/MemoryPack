@@ -56,6 +56,7 @@ public static partial class MemoryPackSerializer
                 MemoryPackSerializationException.ThrowInvalidRange(Unsafe.SizeOf<T>(), buffer.Length);
             }
             value = Unsafe.ReadUnaligned<T>(ref MemoryMarshal.GetReference(buffer));
+            UnmanagedValidator<T?>.Run(ref value);
             return Unsafe.SizeOf<T>();
         }
 
@@ -95,6 +96,7 @@ public static partial class MemoryPackSerializer
             if (sliced.IsSingleSegment)
             {
                 value = Unsafe.ReadUnaligned<T>(ref MemoryMarshal.GetReference(sliced.FirstSpan));
+                UnmanagedValidator<T?>.Run(ref value);
                 return sizeOfT;
             }
             else
@@ -115,6 +117,7 @@ public static partial class MemoryPackSerializer
 
                     sliced.CopyTo(tempSpan);
                     value = Unsafe.ReadUnaligned<T>(ref MemoryMarshal.GetReference(tempSpan));
+                    UnmanagedValidator<T?>.Run(ref value);
                     return sizeOfT;
                 }
                 finally

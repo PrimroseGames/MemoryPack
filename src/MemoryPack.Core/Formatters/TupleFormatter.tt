@@ -96,6 +96,9 @@ public sealed class ValueTupleFormatter<<#= CreateT(i) #>> : MemoryPackFormatter
         if (!System.Runtime.CompilerServices.RuntimeHelpers.IsReferenceOrContainsReferences<ValueTuple<<#= CreateTNull(i) #>>>())
         {
             reader.DangerousReadUnmanaged(out value);
+<# for ( var j = 1; j <= i; j++ ) { #>
+            UnmanagedValidator<<#= (j == 8) ? "TRest" : $"T{j}?" #>>.Run(ref value.<#= ItemOrRest(j) #>);
+<# } #>
             return;
         }
 

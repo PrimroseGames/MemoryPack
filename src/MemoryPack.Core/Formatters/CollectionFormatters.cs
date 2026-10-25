@@ -85,6 +85,12 @@ namespace MemoryPack.Formatters
                 return;
             }
 
+            if (!reader.CanPreallocate<T>(length))
+            {
+                ListFormatter<T>.ReadGrowing(ref reader, ref value, length);
+                return;
+            }
+
             if (value == null)
             {
                 value = new List<T?>(length);
@@ -122,6 +128,12 @@ namespace MemoryPack.Formatters
                 return;
             }
 
+            if (!reader.CanPreallocate<T>(length))
+            {
+                ReadGrowing(ref reader, ref value, length);
+                return;
+            }
+
             if (value == null)
             {
                 value = new List<T?>(length);
@@ -133,6 +145,21 @@ namespace MemoryPack.Formatters
 
             var span = CollectionsMarshalEx.CreateSpan(value, length);
             reader.ReadSpanWithoutReadLengthHeader(length, ref span);
+        }
+
+        // Elements too large to allocate for up front are read before the list is sized.
+        internal static void ReadGrowing(ref MemoryPackReader reader, scoped ref List<T?>? value, int length)
+        {
+            var items = reader.ReadElementsGrowing<T>(length);
+            if (value == null)
+            {
+                value = new List<T?>(items);
+            }
+            else
+            {
+                value.Clear();
+                value.AddRange(items);
+            }
         }
     }
 
@@ -157,6 +184,22 @@ namespace MemoryPack.Formatters
             if (!reader.TryReadCollectionHeader(out var length))
             {
                 value = null;
+                return;
+            }
+
+            if (!reader.CanPreallocate<T>(length))
+            {
+                // Bottom first, as the span would hold them.
+                var items = reader.ReadElementsGrowing<T>(length);
+                if (value == null)
+                {
+                    value = new Stack<T?>(items);
+                }
+                else
+                {
+                    value.Clear();
+                    foreach (var item in items) value.Push(item);
+                }
                 return;
             }
 
@@ -206,14 +249,15 @@ namespace MemoryPack.Formatters
                 return;
             }
 
+            var capacity = reader.GetCapacityHint<T>(length);
             if (value == null)
             {
-                value = new Queue<T?>(length);
+                value = new Queue<T?>(capacity);
             }
             else
             {
                 value.Clear();
-                value.EnsureCapacity(length);
+                value.EnsureCapacity(capacity);
             }
 
             var formatter = reader.GetFormatter<T?>();
@@ -320,7 +364,7 @@ namespace MemoryPack.Formatters
             var comparer = HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options);
             if (value == null || HashFloodingResistantEqualityComparer.ReplacesDefault(comparer, value.Comparer))
             {
-                value = new HashSet<T?>(length, comparer);
+                value = new HashSet<T?>(reader.GetCapacityHint<T>(length), comparer);
             }
             else
             {
@@ -439,7 +483,7 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new PriorityQueue<TElement?, TPriority?>(length);
+                value = new PriorityQueue<TElement?, TPriority?>(reader.GetCapacityHint<(TElement?, TPriority?)>(length));
             }
             else
             {
@@ -778,7 +822,7 @@ namespace MemoryPack.Formatters
             var comparer = HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options);
             if (value == null || HashFloodingResistantEqualityComparer.ReplacesDefault(comparer, value.Comparer))
             {
-                value = new Dictionary<TKey, TValue?>(length, comparer);
+                value = new Dictionary<TKey, TValue?>(reader.GetCapacityHint<KeyValuePair<TKey, TValue?>>(length), comparer);
             }
             else
             {
@@ -906,19 +950,41 @@ namespace MemoryPack.Formatters
 
             if (value == null)
             {
-                value = new SortedList<TKey, TValue?>(length, comparer);
+                value = new SortedList<TKey, TValue?>(reader.GetCapacityHint<KeyValuePair<TKey, TValue?>>(length), comparer);
             }
             else
             {
                 value.Clear();
             }
 
+            // A writer writes the keys in its list's order, so with the same comparer each key appends. Inserting
+            // out of order shifts the list, so keys that arrive out of order are sorted in a tree and appended after.
+            var order = value.Comparer;
+            SortedDictionary<TKey, TValue?>? unordered = null;
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                if (k is null || !value.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(SortedList<TKey, TValue?>), k);
+                if (k is null) MemoryPackSerializationException.ThrowInvalidKey(typeof(SortedList<TKey, TValue?>), k);
+
+                if (unordered == null)
+                {
+                    var count = value.Count;
+                    if (count == 0 || order.Compare(value.Keys[count - 1], k) < 0)
+                    {
+                        value.Add(k, v);
+                        continue;
+                    }
+                    unordered = new SortedDictionary<TKey, TValue?>(value, order);
+                    value.Clear();
+                }
+                if (!unordered.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(SortedList<TKey, TValue?>), k);
+            }
+
+            if (unordered != null)
+            {
+                foreach (var item in unordered) value.Add(item.Key, item.Value);
             }
         }
     }

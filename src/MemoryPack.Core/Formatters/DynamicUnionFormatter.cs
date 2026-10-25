@@ -42,8 +42,13 @@ public sealed class DynamicUnionFormatter<T> : MemoryPackFormatter<T>
         
         if (tagToType.TryGetValue(tag, out var type))
         {
-            object? v = value;
+            // The existing value is read into only when it's what the tag names; casting another to it would throw.
+            object? v = value != null && type.IsInstanceOfType(value) ? value : null;
             reader.ReadValue(type, ref v);
+            if (v is not (null or T))
+            {
+                MemoryPackSerializationException.ThrowNotFoundInUnionType(v.GetType(), typeof(T));
+            }
             value = (T?)v;
         }
         else

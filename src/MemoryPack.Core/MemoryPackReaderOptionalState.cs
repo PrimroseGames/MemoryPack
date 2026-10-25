@@ -91,7 +91,21 @@ public sealed class MemoryPackReaderOptionalState : IDisposable
         }
     }
 
-    /// <summary>Leaves the level entered by <see cref="EnterDepth"/>.</summary>
+    /// <summary>
+    /// <see cref="EnterDepth"/> for a level whose frame can be large, such as one with a stackalloc: probes the stack
+    /// on every entry rather than every sixteenth.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void EnterDepthAndProbeStack()
+    {
+        if (++depth > maxDepth)
+        {
+            MemoryPackSerializationException.ThrowDeserializeDepthExceeded(maxDepth);
+        }
+        StackGuard.Probe();
+    }
+
+    /// <summary>Leaves the level entered by <see cref="EnterDepth"/> or <see cref="EnterDepthAndProbeStack"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ExitDepth() => depth--;
 

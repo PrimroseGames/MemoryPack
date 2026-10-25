@@ -5,8 +5,9 @@ using System.Text;
 namespace MemoryPack.Generator;
 
 // MemoryPackGenerator_ValidateEnumsAndBools: checks on what the reader copies as raw bytes. An enum
-// without [Flags] must hold a declared value or zero, a bool is normalized to 0 or 1, and an
-// unmanaged struct checks its fields. Generated types register the checks with
+// without [Flags] must hold a declared value or zero, a bool is normalized to 0 or 1, a Nullable's
+// has-value flag must be 0 or 1, DateTime, DateTimeOffset, DateOnly, TimeOnly, decimal and Rune must
+// hold values their constructors allow, and an unmanaged struct checks its fields. Generated types register the checks with
 // UnmanagedValidator<T>, which the reader runs after every raw copy, and run them on the members
 // they read raw themselves. Legitimate data reads back unchanged.
 public partial class TypeMeta
@@ -109,10 +110,12 @@ public partial class TypeMeta
             if (t.SpecialType == SpecialType.System_Boolean) return true;
             if (t.TypeKind == TypeKind.TypeParameter) return true; // registered wherever the type argument's checks are
             if (t.TypeKind == TypeKind.Enum) return !IsFlags(t);
+            if (BuiltinValidator(t) != null) return true;
             if (t.SpecialType != SpecialType.None) return false;
             if (!t.IsValueType || !t.IsUnmanagedType || t is not INamedTypeSymbol named) return false;
 
-            if (IsNullable(named)) return HasValidator(named.TypeArguments[0]);
+            // A raw-copied Nullable<T> always has its has-value flag checked.
+            if (IsNullable(named)) return true;
             if (OwnsValidator(named)) return true;
             return Checks(named, type.Symbol).Count != 0;
         }
@@ -157,7 +160,7 @@ public partial class TypeMeta
             if (!HasValidator(t)) return;
 
             var n = (INamedTypeSymbol)t;
-            if (t.TypeKind == TypeKind.Enum)
+            if (t.TypeKind == TypeKind.Enum || BuiltinValidator(t) != null)
             {
                 registered.Add(t);
                 return;
@@ -204,6 +207,10 @@ public partial class TypeMeta
                 {
                     sb.AppendLine($"{indent}{Validator}<{name}>.Register({Validation}.ValidateNullables<{n.TypeArguments[0].FullyQualifiedToString()}>);");
                 }
+                else if (BuiltinValidator(t) is { } builtin)
+                {
+                    sb.AppendLine($"{indent}{Validator}<{name}>.Register({Validation}.{builtin});");
+                }
                 else
                 {
                     sb.AppendLine($"{indent}{Validator}<{name}>.Register({OwnValidatorName}{i});");
@@ -234,6 +241,7 @@ public partial class TypeMeta
             {
                 var t = registered[i];
                 if (t is INamedTypeSymbol n && IsNullable(n)) continue;
+                if (BuiltinValidator(t) != null) continue;
 
                 var name = t.FullyQualifiedToString();
                 if (t.TypeKind == TypeKind.Enum)
@@ -341,6 +349,30 @@ public partial class TypeMeta
             return t.GetMembers()
                 .OfType<IFieldSymbol>()
                 .Where(x => !x.IsStatic && !x.IsConst && !x.IsFixedSizeBuffer);
+        }
+
+        // The MemoryPackValidation method that checks a built-in struct whose raw bytes can break its invariants.
+        static string? BuiltinValidator(ITypeSymbol t)
+        {
+            if (t.SpecialType == SpecialType.System_DateTime) return "ValidateDateTimes";
+            if (t.SpecialType == SpecialType.System_Decimal) return "ValidateDecimals";
+            if (t.SpecialType != SpecialType.None || t.ContainingNamespace == null || t.ContainingType != null) return null;
+
+            var ns = t.ContainingNamespace.ToDisplayString();
+            if (ns == "System")
+            {
+                switch (t.MetadataName)
+                {
+                    case "DateTimeOffset": return "ValidateDateTimeOffsets";
+                    case "DateOnly": return "ValidateDateOnlys";
+                    case "TimeOnly": return "ValidateTimeOnlys";
+                }
+            }
+            else if (ns == "System.Text" && t.MetadataName == "Rune")
+            {
+                return "ValidateRunes";
+            }
+            return null;
         }
 
         static bool IsFlags(ITypeSymbol enumType)

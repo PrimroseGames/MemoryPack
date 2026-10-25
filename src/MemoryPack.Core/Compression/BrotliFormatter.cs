@@ -113,22 +113,83 @@ public sealed class BrotliFormatter : MemoryPackFormatter<byte[]>
             MemoryPackSerializationException.ThrowDecompressionSizeLimitExceeded(decompressionSizeLimit, uncompressedLength);
         }
 
-        if (value == null || value.Length != uncompressedLength)
-        {
-            value = new byte[uncompressedLength];
-        }
-
-        using var decoder = new BrotliDecoder();
-
-        var status = decoder.Decompress(compressedBuffer, value, out var bytesConsumed, out var bytesWritten);
+        using var decoder = new ExactLengthBrotliDecoder(uncompressedLength, compressedBuffer.Length);
+        var status = decoder.Decompress(compressedBuffer, out var bytesConsumed);
         if (status != OperationStatus.Done)
         {
             MemoryPackSerializationException.ThrowCompressionFailed(status);
         }
-
-        if (bytesConsumed != compressedBuffer.Length || bytesWritten != value.Length)
+        if (bytesConsumed != compressedBuffer.Length)
         {
             MemoryPackSerializationException.ThrowCompressionFailed();
+        }
+
+        var output = decoder.GetOutput();
+        if (value == null || value.Length != uncompressedLength)
+        {
+            value = output.ToArray();
+        }
+        else
+        {
+            output.CopyTo(value);
+        }
+    }
+}
+
+// Decompresses into a pooled buffer that grows as output arrives, so a declared length allocates only what the data
+// really expands to, never more than that length. GetOutput throws unless the output is exactly that length.
+internal sealed class ExactLengthBrotliDecoder : IDisposable
+{
+    BrotliDecoder decoder;
+    byte[]? buffer;
+    int written;
+    readonly int expectedLength;
+
+    public ExactLengthBrotliDecoder(int expectedLength, int compressedLength)
+    {
+        this.decoder = new BrotliDecoder();
+        this.expectedLength = expectedLength;
+        this.buffer = ArrayPool<byte>.Shared.Rent((int)Math.Min(expectedLength, Math.Max(4096L, compressedLength * 4L)));
+    }
+
+    // Feeds one chunk of compressed data.
+    public OperationStatus Decompress(ReadOnlySpan<byte> source, out int consumed)
+    {
+        consumed = 0;
+        var buffer = this.buffer!;
+        while (true)
+        {
+            var capacity = Math.Min(buffer.Length, expectedLength);
+            var status = decoder.Decompress(source, buffer.AsSpan(written, capacity - written), out var bytesConsumed, out var bytesWritten);
+            consumed += bytesConsumed;
+            written += bytesWritten;
+            source = source.Slice(bytesConsumed);
+
+            if (status != OperationStatus.DestinationTooSmall) return status;
+
+            // More output than the declared length.
+            if (capacity == expectedLength) MemoryPackSerializationException.ThrowCompressionFailed(status);
+
+            var larger = ArrayPool<byte>.Shared.Rent((int)Math.Min(expectedLength, buffer.Length * 2L));
+            buffer.AsSpan(0, written).CopyTo(larger);
+            ArrayPool<byte>.Shared.Return(buffer);
+            buffer = this.buffer = larger;
+        }
+    }
+
+    public ReadOnlySpan<byte> GetOutput()
+    {
+        if (written != expectedLength) MemoryPackSerializationException.ThrowCompressionFailed();
+        return buffer.AsSpan(0, written);
+    }
+
+    public void Dispose()
+    {
+        decoder.Dispose();
+        if (buffer is { Length: > 0 })
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+            buffer = null;
         }
     }
 }

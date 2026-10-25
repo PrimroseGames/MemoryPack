@@ -179,10 +179,22 @@ namespace MemoryPack.Formatters
                 return;
             }
 
+            value = ReadRented(ref reader, length);
+        }
+
+        internal static Memory<T?> ReadRented(ref MemoryPackReader reader, int length)
+        {
+            if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+            {
+                // Element by element, so a rented array's previous contents are never read into.
+                return reader.ReadElementsIntoRentedArray<T>(length).AsMemory(0, length);
+            }
+
+            reader.CanPreallocate<T>(length); // throws unless the bytes are there
             var memory = ArrayPool<T?>.Shared.Rent(length).AsMemory(0, length);
             var span = memory.Span;
             reader.ReadSpanWithoutReadLengthHeader(length, ref span);
-            value = memory;
+            return memory;
         }
     }
 
@@ -210,10 +222,7 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var memory = ArrayPool<T?>.Shared.Rent(length).AsMemory(0, length);
-            var span = memory.Span;
-            reader.ReadSpanWithoutReadLengthHeader(length, ref span);
-            value = memory;
+            value = MemoryPoolFormatter<T>.ReadRented(ref reader, length);
         }
     }
 }

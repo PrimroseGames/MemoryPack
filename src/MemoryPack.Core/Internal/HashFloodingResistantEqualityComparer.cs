@@ -90,13 +90,17 @@ internal static class HashFloodingResistantEqualityComparer
             if (t == typeof(DateTimeOffset)) return (IEqualityComparer<T>)(object)DateTimeOffsetHashComparer.Instance;
 
             // A nullable key hashes as its value does, so it floods as easily.
-            if (Nullable.GetUnderlyingType(t) is { } underlying) return CreateNullable(underlying);
+            if (Nullable.GetUnderlyingType(t) is { } underlying)
+            {
+                // Reached without naming the enum, which NativeAOT couldn't construct a comparer for.
+                if (underlying.IsEnum) return new NullableEnumHashComparer<T>();
+                return CreateNullable(underlying);
+            }
 
             return null;
         }
 
-        // Spelled out so each NullableHashComparer<U> is visible to NativeAOT. A nullable enum would need
-        // MakeGenericType to reach, so it keeps the default.
+        // Spelled out so each NullableHashComparer<U> is visible to NativeAOT.
         static IEqualityComparer<T>? CreateNullable(Type underlying)
         {
             if (underlying == typeof(bool)) return Wrap<bool>();
@@ -187,6 +191,30 @@ sealed class NullableHashComparer<TUnderlying> : IEqualityComparer<TUnderlying?>
         => x.HasValue ? y.HasValue && inner.Equals(x.GetValueOrDefault(), y.GetValueOrDefault()) : !y.HasValue;
 
     public int GetHashCode(TUnderlying? value) => value.HasValue ? inner.GetHashCode(value.GetValueOrDefault()) : 0;
+}
+
+// T is a nullable enum. Nullable<E> is the has-value flag followed by E at E's own alignment, which for an enum is its
+// size, so the value is the second half of T. Null hashes to 0.
+sealed class NullableEnumHashComparer<T> : IEqualityComparer<T>
+{
+    public bool Equals(T? x, T? y) => EqualityComparer<T>.Default.Equals(x!, y!);
+
+    public int GetHashCode(T value)
+    {
+        ref var first = ref Unsafe.As<T, byte>(ref value);
+        if (first == 0) return 0;
+
+        var size = Unsafe.SizeOf<T>() / 2;
+        ref var bits = ref Unsafe.Add(ref first, size);
+        ulong v = size switch
+        {
+            1 => bits,
+            2 => Unsafe.ReadUnaligned<ushort>(ref bits),
+            4 => Unsafe.ReadUnaligned<uint>(ref bits),
+            _ => Unsafe.ReadUnaligned<ulong>(ref bits),
+        };
+        return HashFloodingResistantEqualityComparer.Fold(SipHash.Hash64Fixed(v, size, HashFloodingResistantEqualityComparer.Key0, HashFloodingResistantEqualityComparer.Key1));
+    }
 }
 
 // Equals treats -0 and +0 as equal, and every NaN as equal to every NaN, so both are made one pattern first.

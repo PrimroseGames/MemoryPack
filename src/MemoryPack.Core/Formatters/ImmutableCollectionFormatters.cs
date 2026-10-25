@@ -189,15 +189,9 @@ namespace MemoryPack.Formatters
 
             // ImmutableQueue<T> has no builder
 
-            var rentArray = ArrayPool<T?>.Shared.Rent(length);
+            var rentArray = reader.ReadElementsIntoRentedArray<T>(length);
             try
             {
-                var formatter = reader.GetFormatter<T?>();
-                for (int i = 0; i < length; i++)
-                {
-                    formatter.Deserialize(ref reader, ref rentArray[i]);
-                }
-
                 if (rentArray.Length == length)
                 {
                     // we can use T[] ctor
@@ -282,15 +276,9 @@ namespace MemoryPack.Formatters
 
             // ImmutableStack<T> has no builder
 
-            var rentArray = ArrayPool<T?>.Shared.Rent(length);
+            var rentArray = reader.ReadElementsIntoRentedArray<T>(length);
             try
             {
-                var formatter = reader.GetFormatter<T?>();
-                for (int i = 0; i < length; i++)
-                {
-                    formatter.Deserialize(ref reader, ref rentArray[i]);
-                }
-
                 if (rentArray.Length == length)
                 {
                     // we can use T[] ctor
@@ -723,15 +711,9 @@ namespace MemoryPack.Formatters
 
             // ImmutableQueue<T> has no builder
 
-            var rentArray = ArrayPool<T?>.Shared.Rent(length);
+            var rentArray = reader.ReadElementsIntoRentedArray<T>(length);
             try
             {
-                var formatter = reader.GetFormatter<T?>();
-                for (int i = 0; i < length; i++)
-                {
-                    formatter.Deserialize(ref reader, ref rentArray[i]);
-                }
-
                 if (rentArray.Length == length)
                 {
                     // we can use T[] ctor
@@ -815,15 +797,9 @@ namespace MemoryPack.Formatters
 
             // ImmutableStack<T> has no builder
 
-            var rentArray = ArrayPool<T?>.Shared.Rent(length);
+            var rentArray = reader.ReadElementsIntoRentedArray<T>(length);
             try
             {
-                var formatter = reader.GetFormatter<T?>();
-                for (int i = 0; i < length; i++)
-                {
-                    formatter.Deserialize(ref reader, ref rentArray[i]);
-                }
-
                 if (rentArray.Length == length)
                 {
                     // we can use T[] ctor

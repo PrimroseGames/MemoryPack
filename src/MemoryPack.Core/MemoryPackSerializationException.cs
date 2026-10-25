@@ -129,12 +129,43 @@ public class MemoryPackSerializationException : Exception
         throw new MemoryPackSerializationException($"The varint {value} doesn't fit {type.Name}.");
     }
 
+    // The key isn't formatted: its ToString can throw or run code of the key's own.
     [DoesNotReturn]
     public static void ThrowInvalidKey(Type collectionType, object? key)
     {
         throw new MemoryPackSerializationException(key is null
             ? $"{collectionType.Name} holds a null key."
-            : $"{collectionType.Name} holds the key '{key}' more than once.");
+            : $"{collectionType.Name} holds a {key.GetType().Name} key more than once.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowInvalidValue(Type type)
+    {
+        throw new MemoryPackSerializationException($"The data holds a {type.Name} outside its valid range.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowNonCanonicalNullable(Type type)
+    {
+        throw new MemoryPackSerializationException($"A Nullable<{type.Name}> holds a has-value flag other than 0 or 1.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowInvalidUnionHeader(byte header)
+    {
+        throw new MemoryPackSerializationException($"The union header {header} is reserved.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowInvalidReference(Type type, uint id)
+    {
+        throw new MemoryPackSerializationException($"The reference id {id} names an object that isn't a {type.Name}.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowInvalidUri(Exception innerException)
+    {
+        throw new MemoryPackSerializationException("The data holds an invalid Uri.", innerException);
     }
 
     [DoesNotReturn]

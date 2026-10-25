@@ -31,6 +31,10 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void EnterDepth() => optionalState.EnterDepth();
 
+    /// <inheritdoc cref="MemoryPackReaderOptionalState.EnterDepthAndProbeStack"/>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void EnterDepthAndProbeStack() => optionalState.EnterDepthAndProbeStack();
+
     /// <inheritdoc cref="MemoryPackReaderOptionalState.ExitDepth"/>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void ExitDepth() => optionalState.ExitDepth();
@@ -242,6 +246,11 @@ public ref partial struct MemoryPackReader
         }
         else
         {
+            // 251-254 are reserved; a writer only writes 255 here, for null.
+            if (firstTag != MemoryPackCode.NullObject)
+            {
+                MemoryPackSerializationException.ThrowInvalidUnionHeader(firstTag);
+            }
             tag = 0;
             return false;
         }
@@ -295,6 +304,13 @@ public ref partial struct MemoryPackReader
     // Every element takes at least one byte of its own (an element nested inside another follows its collection's
     // header), so the counts every header in a read declares can't sum past the read's length. The check against
     // Remaining alone can't see this: nested headers all measure the same tail, so each can claim all of it.
+    //
+    // Room allocated for declared elements before they're read stays within MaxPreallocatedElementSize bytes per
+    // declared element, so within that multiple of the read's length:
+    // - a raw-copied element takes exactly its size, so a count whose bytes aren't there is rejected first;
+    // - a managed element up to MaxPreallocatedElementSize (a reference, a small struct) is allocated for up front;
+    // - a larger one gets room for MaxPreallocatedElementSize bytes per element, which grows as elements arrive.
+    // Capacity hints follow the same rule (GetCapacityHint).
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     void ChargeElementsCore(int count)
     {
@@ -304,6 +320,79 @@ public ref partial struct MemoryPackReader
             MemoryPackSerializationException.ThrowDeclaredElementsExceedData(count, remainingElements);
         }
         remainingElements = remaining;
+    }
+
+    internal const int MaxPreallocatedElementSize = 16;
+
+    /// <summary>
+    /// The capacity a collection that grows as needed may reserve for <paramref name="length"/> declared elements of
+    /// <typeparamref name="T"/> before reading them: never more than the bytes left could fill.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public int GetCapacityHint<T>(int length)
+    {
+        var size = Unsafe.SizeOf<T>();
+        var limit = RuntimeHelpers.IsReferenceOrContainsReferences<T>()
+            ? (long)length * MaxPreallocatedElementSize / size
+            : Remaining / size;
+        return (int)Math.Min(length, limit);
+    }
+
+    // Whether room for `length` elements of T may be allocated before reading them. A T the reader copies raw must
+    // have its bytes in the data, or this throws.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool CanPreallocate<T>(int length)
+    {
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+        {
+            UnmanagedByteCount<T>(length);
+            return true;
+        }
+        return Unsafe.SizeOf<T>() <= MaxPreallocatedElementSize;
+    }
+
+    // Reads `length` elements of a T too large to allocate for up front; the array grows as elements arrive.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    internal T?[] ReadElementsGrowing<T>(int length)
+    {
+        var array = new T?[GetCapacityHint<T>(length)];
+        var formatter = GetFormatter<T>();
+        for (int i = 0; i < length; i++)
+        {
+            // Read first, so data that ends early never grows the array.
+            T? item = default;
+            formatter.Deserialize(ref this, ref item);
+            if (i == array.Length)
+            {
+                Array.Resize(ref array, (int)Math.Min(length, Math.Max(4L, array.Length * 2L)));
+            }
+            array[i] = item;
+        }
+        return array;
+    }
+
+    // Reads `length` elements one at a time into an array rented from the shared pool, at least `length` long, which
+    // grows as elements arrive. Each is read into a fresh local, so the pool's previous contents are never read into.
+    // The caller returns the array.
+    internal T?[] ReadElementsIntoRentedArray<T>(int length)
+    {
+        var pool = ArrayPool<T?>.Shared;
+        var array = pool.Rent(GetCapacityHint<T>(length));
+        var formatter = GetFormatter<T>();
+        for (int i = 0; i < length; i++)
+        {
+            T? item = default;
+            formatter.Deserialize(ref this, ref item);
+            if (i == array.Length)
+            {
+                var larger = pool.Rent((int)Math.Min(length, Math.Max(16L, array.Length * 2L)));
+                array.AsSpan(0, i).CopyTo(larger);
+                pool.Return(array, clearArray: RuntimeHelpers.IsReferenceOrContainsReferences<T>());
+                array = larger;
+            }
+            array[i] = item;
+        }
+        return array;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -337,6 +426,10 @@ public ref partial struct MemoryPackReader
         }
         else
         {
+            if (firstTag != MemoryPackCode.NullObject)
+            {
+                MemoryPackSerializationException.ThrowInvalidUnionHeader(firstTag);
+            }
             tag = 0;
             return false;
         }
@@ -585,6 +678,11 @@ public ref partial struct MemoryPackReader
         // T[] support overwrite
         if (value == null || value.Length != length)
         {
+            if (Unsafe.SizeOf<T>() > MaxPreallocatedElementSize)
+            {
+                value = ReadElementsGrowing<T>(length);
+                return;
+            }
             value = new T[length];
         }
 
@@ -618,6 +716,11 @@ public ref partial struct MemoryPackReader
 
         if (value.Length != length)
         {
+            if (Unsafe.SizeOf<T>() > MaxPreallocatedElementSize)
+            {
+                value = ReadElementsGrowing<T>(length);
+                return;
+            }
             value = new T[length];
         }
 
@@ -662,6 +765,11 @@ public ref partial struct MemoryPackReader
         // T[] support overwrite
         if (value == null || value.Length != length)
         {
+            if (Unsafe.SizeOf<T>() > MaxPreallocatedElementSize)
+            {
+                value = ReadElementsGrowing<T>(length);
+                return;
+            }
             value = new T[length];
         }
 
@@ -695,6 +803,11 @@ public ref partial struct MemoryPackReader
 
         if (value.Length != length)
         {
+            if (Unsafe.SizeOf<T>() > MaxPreallocatedElementSize)
+            {
+                value = ReadElementsGrowing<T>(length);
+                return;
+            }
             value = new T[length];
         }
 
@@ -858,6 +971,11 @@ public ref partial struct MemoryPackReader
         {
             if (value.Length != length)
             {
+                if (Unsafe.SizeOf<T>() > MaxPreallocatedElementSize)
+                {
+                    value = ReadElementsGrowing<T>(length);
+                    return;
+                }
                 value = new T[length];
             }
 
@@ -903,6 +1021,11 @@ public ref partial struct MemoryPackReader
         {
             if (value.Length != length)
             {
+                if (Unsafe.SizeOf<T>() > MaxPreallocatedElementSize)
+                {
+                    value = ReadElementsGrowing<T>(length);
+                    return;
+                }
                 value = new T[length];
             }
 

@@ -68,7 +68,7 @@ namespace MemoryPack.Formatters
             }
 
             var comparer = HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options);
-            var dict = new Dictionary<TKey, TValue?>(length, comparer);
+            var dict = new Dictionary<TKey, TValue?>(reader.GetCapacityHint<KeyValuePair<TKey, TValue?>>(length), comparer);
 
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
@@ -122,7 +122,7 @@ namespace MemoryPack.Formatters
             }
 
             var comparer = HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options);
-            var set = new HashSet<T?>(length, comparer);
+            var set = new HashSet<T?>(reader.GetCapacityHint<T>(length), comparer);
 
             var formatter = reader.GetFormatter<T?>();
             for (int i = 0; i < length; i++)

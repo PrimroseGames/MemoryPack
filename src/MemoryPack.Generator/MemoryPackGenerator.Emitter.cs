@@ -318,9 +318,14 @@ public partial class TypeMeta
 
         var nullable = IsValueType ? "" : "?";
 
-        // Each object read is one level of nesting; an unmanaged value holds no further reads.
-        var enterDepth = IsUnmanagedType ? "" : "        reader.EnterDepth();";
+        // Each object read is one level of nesting; an unmanaged value holds no further reads. A level whose frame can
+        // be large (a version-tolerant level's delta table, or many member locals) probes the stack on every entry.
+        var largeFrame = GenerateType is GenerateType.VersionTolerant or GenerateType.CircularReference || Members.Length > 32;
+        var enterDepth = IsUnmanagedType ? "" : largeFrame ? "        reader.EnterDepthAndProbeStack();" : "        reader.EnterDepth();";
         var exitDepth = IsUnmanagedType ? "" : "        reader.ExitDepth();";
+
+        // A back-reference is an object already read, whose OnDeserialized has run.
+        var referenceEnd = GenerateType == GenerateType.CircularReference ? "    END_REFERENCE:" : "";
 
         var scopedRef = "scoped ref";
         var staticRegisterFormatterMethod = $"static void IMemoryPackFormatterRegister.";
@@ -381,6 +386,7 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>
 {{deserializeBody}}
     END:
 {{OnDeserialized.Select(x => "        " + x.Emit()).NewLine()}}
+{{referenceEnd}}
 {{exitDepth}}
         return;
     }
@@ -432,8 +438,10 @@ partial {{classOrStructOrRecord}} {{TypeName}} : IMemoryPackable<{{TypeName}}>
         if (count == MemoryPackCode.ReferenceId)
         {
             id = reader.ReadVarIntUInt32();
-            value = ({{TypeName}})reader.OptionalState.GetObjectReference(id);
-            goto END;
+            var __reference = reader.OptionalState.GetObjectReference(id);
+            if (__reference is not {{TypeName}}) MemoryPackSerializationException.ThrowInvalidReference(typeof({{TypeName}}), id);
+            value = ({{TypeName}})__reference;
+            goto END_REFERENCE;
         }
 """;
 

@@ -300,7 +300,7 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var dict = new Dictionary<TKey, TValue?>(length, HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options));
+            var dict = new Dictionary<TKey, TValue?>(reader.GetCapacityHint<KeyValuePair<TKey, TValue?>>(length), HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options));
 
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
@@ -359,7 +359,7 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var dict = new Dictionary<TKey, TValue?>(length, HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options));
+            var dict = new Dictionary<TKey, TValue?>(reader.GetCapacityHint<KeyValuePair<TKey, TValue?>>(length), HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options));
 
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
@@ -426,7 +426,7 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var dict = new Dictionary<TKey, IGrouping<TKey, TElement>>(length, HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options));
+            var dict = new Dictionary<TKey, IGrouping<TKey, TElement>>(reader.GetCapacityHint<KeyValuePair<TKey, IGrouping<TKey, TElement>>>(length), HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options));
 
             var formatter = reader.GetFormatter<IGrouping<TKey, TElement>>();
             for (int i = 0; i < length; i++)
@@ -542,7 +542,7 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var set = new HashSet<T?>(length, HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options));
+            var set = new HashSet<T?>(reader.GetCapacityHint<T>(length), HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options));
 
             var formatter = reader.GetFormatter<T>();
             for (int i = 0; i < length; i++)
@@ -606,7 +606,7 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var set = new HashSet<T?>(length, HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options));
+            var set = new HashSet<T?>(reader.GetCapacityHint<T>(length), HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options));
 
             var formatter = reader.GetFormatter<T>();
             for (int i = 0; i < length; i++)

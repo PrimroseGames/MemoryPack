@@ -64,24 +64,100 @@ public static class MemoryPackValidation
         }
     }
 
-    // Nullable<T> keeps its value in a private field; this checks it in place.
+    // Nullable<T> keeps its value in a private field; this checks it in place. Its has-value flag is the first byte,
+    // and a writer only writes 0 or 1 there: lifted operators AND the flag in, so a 2 makes `x > max` false while
+    // `x.Value` still returns the value. Without a value the value bytes are cleared, so equal nulls compare equal.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void RunNullable<T>(ref T? value)
         where T : struct
     {
-        if (value.HasValue && UnmanagedValidator<T>.IsRegistered)
+        var hasValue = Unsafe.As<T?, byte>(ref value);
+        if (hasValue == 0)
+        {
+            value = default;
+            return;
+        }
+        if (hasValue != 1)
+        {
+            MemoryPackSerializationException.ThrowNonCanonicalNullable(typeof(T));
+        }
+        if (UnmanagedValidator<T>.IsRegistered)
         {
             UnmanagedValidator<T>.Run(ref Unsafe.AsRef(in Nullable.GetValueRefOrDefaultRef(in value)));
         }
     }
 
-    // The validator for T? wherever T has one, so arrays and spans of T? are checked too.
+    // The validator for every raw-copied T?, so arrays and spans of T? are checked too.
     public static void ValidateNullables<T>(Span<T?> values)
         where T : struct
     {
         foreach (ref var value in values)
         {
             RunNullable(ref value);
+        }
+    }
+
+    // Built-in structs a raw copy can leave outside what their constructors allow. The generator registers these
+    // for the types a generated type reaches.
+
+    public static void ValidateDateTimes(Span<DateTime> values)
+    {
+        // Ticks are the low 62 bits; all four kinds are valid.
+        foreach (var value in values)
+        {
+            if ((ulong)value.Ticks > (ulong)DateTime.MaxValue.Ticks) MemoryPackSerializationException.ThrowInvalidValue(typeof(DateTime));
+        }
+    }
+
+    public static void ValidateDateTimeOffsets(Span<DateTimeOffset> values)
+    {
+        const long maxOffset = 14 * TimeSpan.TicksPerHour;
+        foreach (var value in values)
+        {
+            var utc = value.UtcTicks;
+            var offset = value.Offset.Ticks;
+            if ((ulong)utc > (ulong)DateTime.MaxValue.Ticks
+             || offset < -maxOffset || offset > maxOffset
+             || (ulong)(utc + offset) > (ulong)DateTime.MaxValue.Ticks)
+            {
+                MemoryPackSerializationException.ThrowInvalidValue(typeof(DateTimeOffset));
+            }
+        }
+    }
+
+    public static void ValidateDateOnlys(Span<DateOnly> values)
+    {
+        foreach (var value in values)
+        {
+            if ((uint)value.DayNumber > (uint)DateOnly.MaxValue.DayNumber) MemoryPackSerializationException.ThrowInvalidValue(typeof(DateOnly));
+        }
+    }
+
+    public static void ValidateTimeOnlys(Span<TimeOnly> values)
+    {
+        foreach (var value in values)
+        {
+            if ((ulong)value.Ticks > (ulong)TimeOnly.MaxValue.Ticks) MemoryPackSerializationException.ThrowInvalidValue(typeof(TimeOnly));
+        }
+    }
+
+    public static void ValidateDecimals(Span<decimal> values)
+    {
+        // The flags word holds the sign in bit 31 and the scale, at most 28, in bits 16-23; the rest is zero.
+        Span<int> bits = stackalloc int[4];
+        foreach (var value in values)
+        {
+            decimal.GetBits(value, bits);
+            var flags = bits[3];
+            if ((flags & 0x7F00FFFF) != 0 || ((flags >> 16) & 0xFF) > 28) MemoryPackSerializationException.ThrowInvalidValue(typeof(decimal));
+        }
+    }
+
+    public static void ValidateRunes(Span<System.Text.Rune> values)
+    {
+        foreach (var value in values)
+        {
+            if (!System.Text.Rune.IsValid(value.Value)) MemoryPackSerializationException.ThrowInvalidValue(typeof(System.Text.Rune));
         }
     }
 }

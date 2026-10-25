@@ -24,7 +24,14 @@ public sealed class UriFormatter : MemoryPackFormatter<Uri>
         }
         else
         {
-            value = new Uri(str, UriKind.RelativeOrAbsolute);
+            try
+            {
+                value = new Uri(str, UriKind.RelativeOrAbsolute);
+            }
+            catch (UriFormatException ex)
+            {
+                MemoryPackSerializationException.ThrowInvalidUri(ex);
+            }
         }
     }
 }

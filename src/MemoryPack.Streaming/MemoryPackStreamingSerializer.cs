@@ -142,18 +142,23 @@ public static class MemoryPackStreamingSerializer
             var buffer = readResult.Buffer;
             if (ReadCollectionHeader(buffer, state, out var length))
             {
-                pipeReader.AdvanceTo(buffer.GetPosition(4));
+                // A buffer can't be used after AdvanceTo, so a completed read, which isn't read again, is sliced instead.
                 if (readResult.IsCompleted)
                 {
                     buffer = buffer.Slice(4);
                 }
+                else
+                {
+                    pipeReader.AdvanceTo(buffer.GetPosition(4));
+                }
 
+                var minimumSize = readMinimumSize;
                 var remain = new StrongBox<int>(length);
                 while (remain.Value != 0)
                 {
                     if (!readResult.IsCompleted)
                     {
-                        readResult = await pipeReader.ReadAtLeastAsync(readMinimumSize, cancellationToken).ConfigureAwait(false);
+                        readResult = await pipeReader.ReadAtLeastAsync(minimumSize, cancellationToken).ConfigureAwait(false);
                         buffer = readResult.Buffer;
                     }
 
@@ -185,7 +190,10 @@ public static class MemoryPackStreamingSerializer
                     }
                     else
                     {
-                        pipeReader.AdvanceTo(buffer.GetPosition(consumedByteCount));
+                        // Nothing read means the next item needs more than is buffered, so wait for more than that;
+                        // asking for the same amount again would return the same bytes at once.
+                        minimumSize = consumedByteCount == 0 ? (int)Math.Min(int.MaxValue, buffer.Length + 1) : readMinimumSize;
+                        pipeReader.AdvanceTo(buffer.GetPosition(consumedByteCount), buffer.End);
                     }
                 }
             }

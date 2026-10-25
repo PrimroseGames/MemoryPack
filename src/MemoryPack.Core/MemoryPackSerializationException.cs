@@ -124,6 +124,20 @@ public class MemoryPackSerializationException : Exception
     }
 
     [DoesNotReturn]
+    public static void ThrowVarIntOutOfRange(Type type, object value)
+    {
+        throw new MemoryPackSerializationException($"The varint {value} doesn't fit {type.Name}.");
+    }
+
+    [DoesNotReturn]
+    public static void ThrowInvalidKey(Type collectionType, object? key)
+    {
+        throw new MemoryPackSerializationException(key is null
+            ? $"{collectionType.Name} holds a null key."
+            : $"{collectionType.Name} holds the key '{key}' more than once.");
+    }
+
+    [DoesNotReturn]
     public static void ThrowNonCanonicalBool(string member)
     {
         throw new MemoryPackSerializationException($"{member} holds a bool other than 0 or 1, and it can't be set to normalize it.");

@@ -790,7 +790,7 @@ namespace MemoryPack.Formatters
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                value.Add(k!, v);
+                if (k is null || !value.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(Dictionary<TKey, TValue?>), k);
             }
         }
     }
@@ -854,7 +854,7 @@ namespace MemoryPack.Formatters
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                value.Add(k!, v);
+                if (k is null || !value.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(SortedDictionary<TKey, TValue?>), k);
             }
         }
     }
@@ -918,7 +918,7 @@ namespace MemoryPack.Formatters
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                value.Add(k!, v);
+                if (k is null || !value.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(SortedList<TKey, TValue?>), k);
             }
         }
     }
@@ -988,7 +988,7 @@ namespace MemoryPack.Formatters
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                value.TryAdd(k!, v);
+                if (k is null || !value.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(ConcurrentDictionary<TKey, TValue?>), k);
             }
         }
     }

@@ -157,7 +157,7 @@ public abstract class GenericDictionaryFormatterBase<TDictionary, TKey, TValue> 
         for (int i = 0; i < length; i++)
         {
             KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-            dict.Add(k!, v);
+            if (k is null || !dict.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(TDictionary), k);
         }
         reader.ExitDepth();
 

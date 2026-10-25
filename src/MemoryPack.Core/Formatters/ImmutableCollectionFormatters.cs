@@ -375,7 +375,7 @@ namespace MemoryPack.Formatters
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                builder.Add(k!, v);
+                if (k is null || !builder.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(ImmutableDictionary<TKey, TValue?>), k);
             }
 
             value = builder.ToImmutable();
@@ -521,7 +521,7 @@ namespace MemoryPack.Formatters
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                builder.Add(k!, v);
+                if (k is null || !builder.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(ImmutableSortedDictionary<TKey, TValue?>), k);
             }
 
             value = builder.ToImmutable();
@@ -911,7 +911,7 @@ namespace MemoryPack.Formatters
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                builder.Add(k!, v);
+                if (k is null || !builder.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(ImmutableDictionary<TKey, TValue?>), k);
             }
 
             value = builder.ToImmutable();

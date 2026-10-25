@@ -234,6 +234,79 @@ public class SecurityBoundsTest
     {
         Rejects<StringBuilder>(Bytes(10, new byte[12]));
     }
+
+    static int ReadVarInt(byte[] payload, string type)
+    {
+        using var state = MemoryPackReaderOptionalStatePool.Rent(null);
+        var reader = new MemoryPackReader(payload, state);
+        _ = type switch
+        {
+            "byte" => (object)reader.ReadVarIntByte(),
+            "sbyte" => reader.ReadVarIntSByte(),
+            "ushort" => reader.ReadVarIntUInt16(),
+            "short" => reader.ReadVarIntInt16(),
+            "uint" => reader.ReadVarIntUInt32(),
+            "int" => reader.ReadVarIntInt32(),
+            "ulong" => reader.ReadVarIntUInt64(),
+            "long" => reader.ReadVarIntInt64(),
+            _ => throw new ArgumentException(type),
+        };
+        return reader.Consumed;
+    }
+
+    // The first byte is the value itself or a code naming the width that follows: 0x87 byte,
+    // 0x86 sbyte, 0x85 ushort, 0x84 short, 0x83 uint, 0x82 int, 0x81 ulong, 0x80 long.
+    [Theory]
+    [InlineData(new byte[] { 0xFF }, "byte")]
+    [InlineData(new byte[] { 0x85, 0x00, 0x01 }, "byte")]
+    [InlineData(new byte[] { 0x87, 0xC8 }, "sbyte")]
+    [InlineData(new byte[] { 0x82, 0xFF, 0xFF, 0xFF, 0xFF }, "ushort")]
+    [InlineData(new byte[] { 0x85, 0x40, 0x9C }, "short")]
+    [InlineData(new byte[] { 0x80, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF }, "uint")]
+    [InlineData(new byte[] { 0x83, 0x00, 0x00, 0x00, 0x80 }, "int")]
+    [InlineData(new byte[] { 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00 }, "int")]
+    [InlineData(new byte[] { 0x86, 0xFB }, "ulong")]
+    [InlineData(new byte[] { 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80 }, "long")]
+    public void VarIntOutsideTheTargetType(byte[] payload, string type)
+    {
+        var act = () => ReadVarInt(payload, type);
+        act.Should().Throw<MemoryPackSerializationException>();
+    }
+
+    [Fact]
+    public void VarIntByteReadsTheWholeUInt16()
+    {
+        ReadVarInt(new byte[] { 0x85, 0xC8, 0x00, 0x7F }, "byte").Should().Be(3);
+        ReadVarInt(new byte[] { 0x86, 0xFB }, "long").Should().Be(2);
+    }
+
+    [Fact]
+    public void DictionaryWithARepeatedKey()
+    {
+        var payload = Bytes(2, 1, 10, 1, 20);
+        Rejects<Dictionary<int, int>>(payload);
+        Rejects<SortedDictionary<int, int>>(payload);
+        Rejects<SortedList<int, int>>(payload);
+        Rejects<System.Collections.Concurrent.ConcurrentDictionary<int, int>>(payload);
+        Rejects<System.Collections.Frozen.FrozenDictionary<int, int>>(payload);
+        Rejects<System.Collections.Immutable.ImmutableDictionary<int, int>>(payload);
+        Rejects<System.Collections.Immutable.ImmutableSortedDictionary<int, int>>(payload);
+        Rejects<System.Collections.Immutable.IImmutableDictionary<int, int>>(payload);
+        Rejects<IDictionary<int, int>>(payload);
+        Rejects<IReadOnlyDictionary<int, int>>(payload);
+    }
+
+    [Fact]
+    public void DictionaryWithANullKey()
+    {
+        // One entry whose string key is the null string.
+        var payload = Bytes(1, -1, 5);
+        Rejects<Dictionary<string, int>>(payload);
+        Rejects<SortedDictionary<string, int>>(payload);
+        Rejects<System.Collections.Frozen.FrozenDictionary<string, int>>(payload);
+        Rejects<System.Collections.Immutable.ImmutableDictionary<string, int>>(payload);
+        Rejects<IReadOnlyDictionary<string, int>>(payload);
+    }
 }
 
 [StructLayout(LayoutKind.Sequential, Size = 4096)]

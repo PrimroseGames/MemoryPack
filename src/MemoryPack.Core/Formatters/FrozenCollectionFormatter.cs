@@ -75,7 +75,7 @@ namespace MemoryPack.Formatters
             for (var i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                dict.Add(k!, v);
+                if (k is null || !dict.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(FrozenDictionary<TKey, TValue?>), k);
             }
             value = dict.ToFrozenDictionary(comparer);
         }

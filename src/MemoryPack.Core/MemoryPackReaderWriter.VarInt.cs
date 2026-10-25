@@ -1,4 +1,7 @@
-﻿namespace MemoryPack;
+﻿using System.Numerics;
+using System.Runtime.CompilerServices;
+
+namespace MemoryPack;
 
 // VarInt, first sbyte is value or typeCode
 
@@ -219,219 +222,44 @@ public ref partial struct MemoryPackWriter<TBufferWriter>
 
 public ref partial struct MemoryPackReader
 {
-    public byte ReadVarIntByte()
+    public byte ReadVarIntByte() => ReadVarInt<byte>();
+    public sbyte ReadVarIntSByte() => ReadVarInt<sbyte>();
+    public ushort ReadVarIntUInt16() => ReadVarInt<ushort>();
+    public short ReadVarIntInt16() => ReadVarInt<short>();
+    public uint ReadVarIntUInt32() => ReadVarInt<uint>();
+    public int ReadVarIntInt32() => ReadVarInt<int>();
+    public ulong ReadVarIntUInt64() => ReadVarInt<ulong>();
+    public long ReadVarIntInt64() => ReadVarInt<long>();
+
+    // Reads the full width the code names, then rejects a value the target type can't hold.
+    T ReadVarInt<T>() where T : IBinaryInteger<T>
     {
         ReadUnmanaged(out sbyte typeCode);
 
-        switch (typeCode)
+        return typeCode switch
         {
-            case VarIntCodes.Byte:
-                return ReadUnmanaged<byte>();
-            case VarIntCodes.SByte:
-                return checked((byte)ReadUnmanaged<sbyte>());
-            case VarIntCodes.UInt16:
-                return checked((byte)ReadUnmanaged<byte>());
-            case VarIntCodes.Int16:
-                return checked((byte)ReadUnmanaged<short>());
-            case VarIntCodes.UInt32:
-                return checked((byte)ReadUnmanaged<uint>());
-            case VarIntCodes.Int32:
-                return checked((byte)ReadUnmanaged<int>());
-            case VarIntCodes.UInt64:
-                return checked((byte)ReadUnmanaged<ulong>());
-            case VarIntCodes.Int64:
-                return checked((byte)ReadUnmanaged<long>());
-            default:
-                return checked((byte)typeCode);
-        }
+            VarIntCodes.Byte => Narrow<byte, T>(ReadUnmanaged<byte>()),
+            VarIntCodes.SByte => Narrow<sbyte, T>(ReadUnmanaged<sbyte>()),
+            VarIntCodes.UInt16 => Narrow<ushort, T>(ReadUnmanaged<ushort>()),
+            VarIntCodes.Int16 => Narrow<short, T>(ReadUnmanaged<short>()),
+            VarIntCodes.UInt32 => Narrow<uint, T>(ReadUnmanaged<uint>()),
+            VarIntCodes.Int32 => Narrow<int, T>(ReadUnmanaged<int>()),
+            VarIntCodes.UInt64 => Narrow<ulong, T>(ReadUnmanaged<ulong>()),
+            VarIntCodes.Int64 => Narrow<long, T>(ReadUnmanaged<long>()),
+            _ => Narrow<sbyte, T>(typeCode),
+        };
     }
 
-    public sbyte ReadVarIntSByte()
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    static TTo Narrow<TFrom, TTo>(TFrom value)
+        where TFrom : IBinaryInteger<TFrom>
+        where TTo : IBinaryInteger<TTo>
     {
-        ReadUnmanaged(out sbyte typeCode);
-
-        switch (typeCode)
+        var result = TTo.CreateTruncating(value);
+        if (TFrom.CreateTruncating(result) != value || TFrom.IsNegative(value) != TTo.IsNegative(result))
         {
-            case VarIntCodes.Byte:
-                return checked((sbyte)ReadUnmanaged<byte>());
-            case VarIntCodes.SByte:
-                return ReadUnmanaged<sbyte>();
-            case VarIntCodes.UInt16:
-                return checked((sbyte)ReadUnmanaged<ushort>());
-            case VarIntCodes.Int16:
-                return checked((sbyte)ReadUnmanaged<short>());
-            case VarIntCodes.UInt32:
-                return checked((sbyte)ReadUnmanaged<uint>());
-            case VarIntCodes.Int32:
-                return checked((sbyte)ReadUnmanaged<int>());
-            case VarIntCodes.UInt64:
-                return checked((sbyte)ReadUnmanaged<ulong>());
-            case VarIntCodes.Int64:
-                return checked((sbyte)ReadUnmanaged<long>());
-            default:
-                return typeCode;
+            MemoryPackSerializationException.ThrowVarIntOutOfRange(typeof(TTo), value);
         }
-    }
-
-    public ushort ReadVarIntUInt16()
-    {
-        ReadUnmanaged(out sbyte typeCode);
-
-        switch (typeCode)
-        {
-            case VarIntCodes.Byte:
-                return ReadUnmanaged<byte>();
-            case VarIntCodes.SByte:
-                return checked((ushort)ReadUnmanaged<sbyte>());
-            case VarIntCodes.UInt16:
-                return ReadUnmanaged<ushort>();
-            case VarIntCodes.Int16:
-                return checked((ushort)ReadUnmanaged<short>());
-            case VarIntCodes.UInt32:
-                return checked((ushort)ReadUnmanaged<uint>());
-            case VarIntCodes.Int32:
-                return checked((ushort)ReadUnmanaged<int>());
-            case VarIntCodes.UInt64:
-                return checked((ushort)ReadUnmanaged<ulong>());
-            case VarIntCodes.Int64:
-                return checked((ushort)ReadUnmanaged<long>());
-            default:
-                return checked((ushort)typeCode);
-        }
-    }
-
-    public short ReadVarIntInt16()
-    {
-        ReadUnmanaged(out sbyte typeCode);
-
-        switch (typeCode)
-        {
-            case VarIntCodes.Byte:
-                return ReadUnmanaged<byte>();
-            case VarIntCodes.SByte:
-                return ReadUnmanaged<sbyte>();
-            case VarIntCodes.UInt16:
-                return checked((short)ReadUnmanaged<ushort>());
-            case VarIntCodes.Int16:
-                return ReadUnmanaged<short>();
-            case VarIntCodes.UInt32:
-                return checked((short)ReadUnmanaged<uint>());
-            case VarIntCodes.Int32:
-                return checked((short)ReadUnmanaged<int>());
-            case VarIntCodes.UInt64:
-                return checked((short)ReadUnmanaged<ulong>());
-            case VarIntCodes.Int64:
-                return checked((short)ReadUnmanaged<long>());
-            default:
-                return typeCode;
-        }
-    }
-
-    public uint ReadVarIntUInt32()
-    {
-        ReadUnmanaged(out sbyte typeCode);
-
-        switch (typeCode)
-        {
-            case VarIntCodes.Byte:
-                return ReadUnmanaged<byte>();
-            case VarIntCodes.SByte:
-                return checked((uint)ReadUnmanaged<sbyte>());
-            case VarIntCodes.UInt16:
-                return ReadUnmanaged<ushort>();
-            case VarIntCodes.Int16:
-                return checked((uint)ReadUnmanaged<short>());
-            case VarIntCodes.UInt32:
-                return ReadUnmanaged<uint>();
-            case VarIntCodes.Int32:
-                return checked((uint)ReadUnmanaged<int>());
-            case VarIntCodes.UInt64:
-                return checked((uint)ReadUnmanaged<ulong>());
-            case VarIntCodes.Int64:
-                return checked((uint)ReadUnmanaged<long>());
-            default:
-                return checked((uint)typeCode);
-        }
-    }
-
-    public int ReadVarIntInt32()
-    {
-        ReadUnmanaged(out sbyte typeCode);
-
-        switch (typeCode)
-        {
-            case VarIntCodes.Byte:
-                return ReadUnmanaged<byte>();
-            case VarIntCodes.SByte:
-                return ReadUnmanaged<sbyte>();
-            case VarIntCodes.UInt16:
-                return ReadUnmanaged<ushort>();
-            case VarIntCodes.Int16:
-                return ReadUnmanaged<short>();
-            case VarIntCodes.UInt32:
-                return checked((int)ReadUnmanaged<uint>());
-            case VarIntCodes.Int32:
-                return ReadUnmanaged<int>();
-            case VarIntCodes.UInt64:
-                return checked((int)ReadUnmanaged<ulong>());
-            case VarIntCodes.Int64:
-                return checked((int)ReadUnmanaged<long>());
-            default:
-                return typeCode;
-        }
-    }
-
-    public ulong ReadVarIntUInt64()
-    {
-        ReadUnmanaged(out sbyte typeCode);
-
-        switch (typeCode)
-        {
-            case VarIntCodes.Byte:
-                return ReadUnmanaged<byte>();
-            case VarIntCodes.SByte:
-                return checked((ulong)ReadUnmanaged<sbyte>());
-            case VarIntCodes.UInt16:
-                return ReadUnmanaged<ushort>();
-            case VarIntCodes.Int16:
-                return checked((ulong)ReadUnmanaged<short>());
-            case VarIntCodes.UInt32:
-                return ReadUnmanaged<uint>();
-            case VarIntCodes.Int32:
-                return checked((ulong)ReadUnmanaged<int>());
-            case VarIntCodes.UInt64:
-                return ReadUnmanaged<ulong>();
-            case VarIntCodes.Int64:
-                return checked((ulong)ReadUnmanaged<long>());
-            default:
-                return checked((ulong)typeCode);
-        }
-    }
-
-    public long ReadVarIntInt64()
-    {
-        ReadUnmanaged(out sbyte typeCode);
-
-        switch (typeCode)
-        {
-            case VarIntCodes.Byte:
-                return ReadUnmanaged<byte>();
-            case VarIntCodes.SByte:
-                return ReadUnmanaged<sbyte>();
-            case VarIntCodes.UInt16:
-                return ReadUnmanaged<ushort>();
-            case VarIntCodes.Int16:
-                return ReadUnmanaged<short>();
-            case VarIntCodes.UInt32:
-                return ReadUnmanaged<uint>();
-            case VarIntCodes.Int32:
-                return ReadUnmanaged<int>();
-            case VarIntCodes.UInt64:
-                return checked((long)ReadUnmanaged<ulong>());
-            case VarIntCodes.Int64:
-                return ReadUnmanaged<long>();
-            default:
-                return typeCode;
-        }
+        return result;
     }
 }

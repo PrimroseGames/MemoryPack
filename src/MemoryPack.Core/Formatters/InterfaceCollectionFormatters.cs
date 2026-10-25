@@ -307,7 +307,7 @@ namespace MemoryPack.Formatters
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                dict.Add(k!, v);
+                if (k is null || !dict.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(Dictionary<TKey, TValue?>), k);
             }
 
             value = dict;
@@ -366,7 +366,7 @@ namespace MemoryPack.Formatters
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
-                dict.Add(k!, v);
+                if (k is null || !dict.TryAdd(k, v)) MemoryPackSerializationException.ThrowInvalidKey(typeof(Dictionary<TKey, TValue?>), k);
             }
 
             value = dict;
@@ -435,7 +435,7 @@ namespace MemoryPack.Formatters
                 formatter.Deserialize(ref reader, ref item);
                 if (item != null)
                 {
-                    dict.Add(item.Key, item);
+                    if (item.Key is null || !dict.TryAdd(item.Key, item)) MemoryPackSerializationException.ThrowInvalidKey(typeof(ILookup<TKey, TElement>), item.Key);
                 }
             }
             value = new Lookup<TKey, TElement>(dict);

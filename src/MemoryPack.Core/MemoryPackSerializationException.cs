@@ -64,6 +64,12 @@ public class MemoryPackSerializationException : Exception
     }
 
     [DoesNotReturn]
+    public static void ThrowInvalidLength(long length)
+    {
+        throw new MemoryPackSerializationException($"The data holds an invalid length, {length}.");
+    }
+
+    [DoesNotReturn]
     public static void ThrowInsufficientBufferUnless(int length)
     {
         throw new MemoryPackSerializationException($"Length header size is larger than buffer size, length: {length}.");

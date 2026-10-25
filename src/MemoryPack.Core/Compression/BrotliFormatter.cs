@@ -104,6 +104,10 @@ public sealed class BrotliFormatter : MemoryPackFormatter<byte[]>
         }
 
         // security, require to check length
+        if (uncompressedLength < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(uncompressedLength);
+        }
         if (decompressionSizeLimit < uncompressedLength)
         {
             MemoryPackSerializationException.ThrowDecompressionSizeLimitExceeded(decompressionSizeLimit, uncompressedLength);

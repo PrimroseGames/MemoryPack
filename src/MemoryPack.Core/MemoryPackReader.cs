@@ -74,7 +74,8 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref byte GetSpanReference(int sizeHint)
     {
-        if (sizeHint <= bufferLength)
+        // Unsigned, so a negative size takes the slow path, which rejects it.
+        if ((uint)sizeHint <= (uint)bufferLength)
         {
 #if NET7_0_OR_GREATER
             return ref bufferReference;
@@ -89,6 +90,11 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.NoInlining)]
     ref byte GetNextSpan(int sizeHint)
     {
+        if (sizeHint < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(sizeHint);
+        }
+
         if (rentBuffer != null)
         {
             ArrayPool<byte>.Shared.Return(rentBuffer);
@@ -153,8 +159,8 @@ public ref partial struct MemoryPackReader
     {
         if (count == 0) return;
 
-        var rest = bufferLength - count;
-        if (rest < 0)
+        // Unsigned, so a negative count takes the slow path, which rejects it.
+        if ((uint)count > (uint)bufferLength)
         {
             if (TryAdvanceSequence(count))
             {
@@ -162,7 +168,7 @@ public ref partial struct MemoryPackReader
             }
         }
 
-        bufferLength = rest;
+        bufferLength -= count;
 #if NET7_0_OR_GREATER
         bufferReference = ref Unsafe.Add(ref bufferReference, count);
 #else
@@ -175,8 +181,9 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.NoInlining)]
     bool TryAdvanceSequence(int count)
     {
-        var rest = bufferSource.Length - count;
-        if (rest < 0)
+        // bufferSource still starts advancedCount bytes behind the read position.
+        var rest = bufferSource.Length - advancedCount - (long)count;
+        if (count < 0 || rest < 0)
         {
             MemoryPackSerializationException.ThrowInvalidAdvance();
         }
@@ -291,6 +298,12 @@ public ref partial struct MemoryPackReader
             MemoryPackSerializationException.ThrowInsufficientBufferUnless(length);
         }
 
+        // -1 is null; no other negative length is a collection.
+        if (length < MemoryPackCode.NullCollection)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
+
         return length != MemoryPackCode.NullCollection;
     }
 
@@ -341,6 +354,11 @@ public ref partial struct MemoryPackReader
             MemoryPackSerializationException.ThrowInsufficientBufferUnless(length);
         }
 
+        if (length < MemoryPackCode.NullCollection)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
+
         return length != MemoryPackCode.NullCollection;
     }
 
@@ -359,7 +377,11 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string? ReadString()
     {
-        if (!TryReadCollectionHeader(out var length))
+        // Not TryReadCollectionHeader: a UTF-8 string's length is stored complemented, so negative.
+        var length = Unsafe.ReadUnaligned<int>(ref GetSpanReference(4));
+        Advance(4);
+
+        if (length == MemoryPackCode.NullCollection)
         {
             return null;
         }
@@ -381,7 +403,12 @@ public ref partial struct MemoryPackReader
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     string ReadUtf16(int length)
     {
-        var byteCount = checked(length * 2);
+        if (length > Remaining / 2)
+        {
+            MemoryPackSerializationException.ThrowInsufficientBufferUnless(length);
+        }
+
+        var byteCount = length * 2;
         ref var src = ref GetSpanReference(byteCount);
 
         var str = new string(MemoryMarshal.CreateReadOnlySpan(ref Unsafe.As<byte, char>(ref src), length));
@@ -399,6 +426,12 @@ public ref partial struct MemoryPackReader
 
         utf8Length = ~utf8Length;
 
+        // Checked before adding the utf16 length's 4 bytes, which would overflow a huge length.
+        if (utf8Length > Remaining - 4)
+        {
+            MemoryPackSerializationException.ThrowInsufficientBufferUnless(utf8Length);
+        }
+
         ref var spanRef = ref GetSpanReference(utf8Length + 4); // + read utf16 length
 
         string str;
@@ -411,12 +444,10 @@ public ref partial struct MemoryPackReader
         }
         else
         {
-            // check malformed utf16Length
-            var max = unchecked((Remaining + 1) * 3);
-            if (max < 0) max = int.MaxValue;
-            if (max < utf16Length)
+            // Every UTF-16 unit takes at least one UTF-8 byte.
+            if (utf16Length > utf8Length)
             {
-                MemoryPackSerializationException.ThrowInsufficientBufferUnless(utf8Length);
+                MemoryPackSerializationException.ThrowInvalidLength(utf16Length);
             }
 
 
@@ -433,6 +464,11 @@ public ref partial struct MemoryPackReader
                         if (status != OperationStatus.Done)
                         {
                             MemoryPackSerializationException.ThrowFailedEncoding(status);
+                        }
+                        // The header's UTF-16 length must be the decoded length, or the string ends in NULs.
+                        if (charsWritten != dest.Length)
+                        {
+                            MemoryPackSerializationException.ThrowInvalidLength(dest.Length);
                         }
                     });
                 }
@@ -729,6 +765,19 @@ public ref partial struct MemoryPackReader
         DangerousReadUnmanagedSpan<T>(ref value);
     }
 
+    // The bytes `length` elements of T take, rejected unless the data holds them. Multiplied in
+    // 64 bits, so a large T can't wrap the count past the bounds check.
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    int UnmanagedByteCount<T>(int length)
+    {
+        var byteCount = (long)length * Unsafe.SizeOf<T>();
+        if (length < 0 || byteCount > Remaining || byteCount > int.MaxValue)
+        {
+            MemoryPackSerializationException.ThrowInsufficientBufferUnless(length);
+        }
+        return (int)byteCount;
+    }
+
     // T: should be unamanged type
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public unsafe T[]? DangerousReadUnmanagedArray<T>()
@@ -740,7 +789,7 @@ public ref partial struct MemoryPackReader
 
         if (length == 0) return Array.Empty<T>();
 
-        var byteCount = length * Unsafe.SizeOf<T>();
+        var byteCount = UnmanagedByteCount<T>(length);
         ref var src = ref GetSpanReference(byteCount);
         var dest = AllocateUninitializedArray<T>(length);
         Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref GetArrayDataReference(dest)), ref src, (uint)byteCount);
@@ -764,7 +813,7 @@ public ref partial struct MemoryPackReader
             return;
         }
 
-        var byteCount = length * Unsafe.SizeOf<T>();
+        var byteCount = UnmanagedByteCount<T>(length);
         ref var src = ref GetSpanReference(byteCount);
 
         if (value == null || value.Length != length)
@@ -793,7 +842,7 @@ public ref partial struct MemoryPackReader
             return;
         }
 
-        var byteCount = length * Unsafe.SizeOf<T>();
+        var byteCount = UnmanagedByteCount<T>(length);
         ref var src = ref GetSpanReference(byteCount);
 
         if (value == null || value.Length != length)
@@ -818,14 +867,19 @@ public ref partial struct MemoryPackReader
             return;
         }
 
+        if (length < 0 || length > Remaining)
+        {
+            MemoryPackSerializationException.ThrowInsufficientBufferUnless(length);
+        }
+
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
+            var byteCount = UnmanagedByteCount<T>(length);
             if (value.Length != length)
             {
                 value = AllocateUninitializedArray<T>(length);
             }
 
-            var byteCount = length * Unsafe.SizeOf<T>();
             ref var src = ref GetSpanReference(byteCount);
             ref var dest = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value)!);
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
@@ -861,14 +915,19 @@ public ref partial struct MemoryPackReader
             return;
         }
 
+        if (length < 0 || length > Remaining)
+        {
+            MemoryPackSerializationException.ThrowInsufficientBufferUnless(length);
+        }
+
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
         {
+            var byteCount = UnmanagedByteCount<T>(length);
             if (value.Length != length)
             {
                 value = AllocateUninitializedArray<T>(length);
             }
 
-            var byteCount = length * Unsafe.SizeOf<T>();
             ref var src = ref GetSpanReference(byteCount);
             ref var dest = ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(value)!);
             Unsafe.CopyBlockUnaligned(ref dest, ref src, (uint)byteCount);
@@ -908,7 +967,7 @@ public ref partial struct MemoryPackReader
             return;
         }
 
-        var byteCount = length * Unsafe.SizeOf<T>();
+        var byteCount = UnmanagedByteCount<T>(length);
         ref var src = ref GetSpanReference(byteCount);
 
         var span = MemoryMarshal.CreateReadOnlySpan(ref src, byteCount);

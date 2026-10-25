@@ -115,6 +115,11 @@ public sealed class BitPackFormatter : MemoryPackFormatter<bool[]>
             return;
         }
 
+        if (length < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
+
         var readCount = ((length - 1) / 32) + 1;
         var requireSize = readCount * 4;
         if (reader.Remaining < requireSize)

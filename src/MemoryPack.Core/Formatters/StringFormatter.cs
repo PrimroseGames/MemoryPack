@@ -186,13 +186,17 @@ public sealed class BrotliStringFormatter : MemoryPackFormatter<string>
             return;
         }
 
-        var byteLength = length * 2;
-
-        // security, require to check length
-        if (decompressionSizeLimit < byteLength)
+        if (length < 0)
         {
-            MemoryPackSerializationException.ThrowDecompressionSizeLimitExceeded(decompressionSizeLimit, byteLength);
+            MemoryPackSerializationException.ThrowInvalidLength(length);
         }
+
+        // security, require to check length. In 64 bits, so a huge length can't wrap under the limit.
+        if (decompressionSizeLimit < (long)length * 2)
+        {
+            MemoryPackSerializationException.ThrowDecompressionSizeLimitExceeded(decompressionSizeLimit, length);
+        }
+        var byteLength = length * 2;
 
         reader.GetRemainingSource(out var singleSource, out var remainingSource);
 
@@ -258,6 +262,11 @@ public sealed class BrotliStringFormatter : MemoryPackFormatter<string>
                 if (status != OperationStatus.Done)
                 {
                     MemoryPackSerializationException.ThrowCompressionFailed(status);
+                }
+                // The stated length must be the decompressed length, or the string ends in NULs.
+                if (destination.Length != 0)
+                {
+                    MemoryPackSerializationException.ThrowCompressionFailed();
                 }
 
                 state.consumedBox.Value = consumed;

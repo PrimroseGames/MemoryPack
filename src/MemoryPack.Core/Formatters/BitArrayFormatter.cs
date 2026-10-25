@@ -37,10 +37,20 @@ public sealed class BitArrayFormatter : MemoryPackFormatter<BitArray>
 
         reader.ReadUnmanaged(out int length);
 
-        var bitArray = new BitArray(length, false); // create internal int[] and set m_length to length
+        // The array is read before anything is sized by length, and has to hold length bits. It can
+        // be longer: a BitArray keeps its array when shortened by less than its shrink threshold.
+        int[]? array = null;
+        reader.ReadUnmanagedArray(ref array);
+        if (array == null || length < 0 || (length + 31L) / 32 > array.Length)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
+
+        var bitArray = new BitArray(0);
 
         ref var view = ref Unsafe.As<BitArray, BitArrayView>(ref bitArray);
-        reader.ReadUnmanagedArray(ref view.m_array!);
+        view.m_array = array;
+        view.m_length = length;
 
         value = bitArray;
     }

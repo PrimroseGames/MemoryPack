@@ -50,6 +50,12 @@ public sealed class StringBuilderFormatter : MemoryPackFormatter<StringBuilder>
             return;
         }
 
+        // Two bytes a char, checked before the builder is sized by length.
+        if ((long)length * 2 > reader.Remaining)
+        {
+            MemoryPackSerializationException.ThrowInsufficientBufferUnless(length);
+        }
+
         if (value == null)
         {
             value = new StringBuilder(length);
@@ -62,7 +68,7 @@ public sealed class StringBuilderFormatter : MemoryPackFormatter<StringBuilder>
 
         // note: require to check is Utf8
         // note: to improvement append as chunk(per 64K?)
-        var size = checked(length * 2);
+        var size = length * 2;
         ref var p = ref reader.GetSpanReference(size);
         var src = MemoryMarshal.CreateSpan(ref Unsafe.As<byte, char>(ref p), length);
         value.Append(src);

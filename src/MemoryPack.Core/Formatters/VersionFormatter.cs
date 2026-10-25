@@ -32,6 +32,12 @@ public sealed class VersionFormatter : MemoryPackFormatter<Version>
 
         reader.ReadUnmanaged(out int major, out int minor, out int build, out int revision);
 
+        // What a Version can hold: build and revision are -1 when unset, and revision only with build.
+        if (major < 0 || minor < 0 || build < -1 || revision < -1 || (build == -1 && revision != -1))
+        {
+            MemoryPackSerializationException.ThrowMessage($"The data holds an invalid Version, {major}.{minor}.{build}.{revision}.");
+        }
+
         // when use new Version(major, minor), build and revision will be -1, it can not use constructor.
         if (revision == -1)
         {

@@ -71,6 +71,8 @@ public sealed class TwoDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,]>
             MemoryPackSerializationException.ThrowInvalidCollection();
         }
 
+        MultiDimensionalArrayLength.Check<T>(ref reader, length, iLength, jLength);
+
         if (value != null && value.GetLength(0) == iLength && value.GetLength(1) == jLength && value.Length == length)
         {
             // allow overwrite
@@ -181,6 +183,8 @@ public sealed class ThreeDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,
         {
             MemoryPackSerializationException.ThrowInvalidCollection();
         }
+
+        MultiDimensionalArrayLength.Check<T>(ref reader, length, iLength, jLength, kLength);
 
         if (value != null && value.GetLength(0) == iLength && value.GetLength(1) == jLength && value.GetLength(2) == kLength && value.Length == length)
         {
@@ -301,6 +305,8 @@ public sealed class FourDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,,
             MemoryPackSerializationException.ThrowInvalidCollection();
         }
 
+        MultiDimensionalArrayLength.Check<T>(ref reader, length, iLength, jLength, kLength, lLength);
+
         if (value != null && value.GetLength(0) == iLength && value.GetLength(1) == jLength && value.GetLength(2) == kLength && value.GetLength(3) == lLength && value.Length == length)
         {
             // allow overwrite
@@ -357,6 +363,40 @@ public sealed class FourDimensionalArrayFormatter<T> : MemoryPackFormatter<T?[,,
 
                 formatter.Deserialize(ref reader, ref value[i, j, k, l]);
             }
+        }
+    }
+}
+
+internal static class MultiDimensionalArrayLength
+{
+    // A writer stores the dimensions, then their product as the element count. Anything else is
+    // malformed. The array allocated is the product, so tying it to the element count, which the
+    // collection header already bounds by the data's length, bounds the allocation too.
+    public static void Check<T>(ref MemoryPackReader reader, int length, int i, int j, int k = 1, int l = 1)
+    {
+        if ((i | j | k | l) < 0)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(Math.Min(Math.Min(i, j), Math.Min(k, l)));
+        }
+
+        // Any zero dimension makes an empty array, however large the others. Otherwise each step
+        // stays under 2^62, since the running product is compared with an int before multiplying.
+        long product = 0;
+        if (i != 0 && j != 0 && k != 0 && l != 0)
+        {
+            product = i;
+            if (product <= length) product *= j;
+            if (product <= length) product *= k;
+            if (product <= length) product *= l;
+        }
+        if (product != length)
+        {
+            MemoryPackSerializationException.ThrowInvalidLength(length);
+        }
+
+        if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>() && (long)Unsafe.SizeOf<T>() * length > Math.Min(reader.Remaining, int.MaxValue))
+        {
+            MemoryPackSerializationException.ThrowInsufficientBufferUnless(length);
         }
     }
 }

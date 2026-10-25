@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace MemoryPack.Tests;
@@ -32,6 +33,25 @@ public class WireGoldenTest
     [Fact] public void VersionTolerant() => Check(nameof(VersionTolerant), GoldenData.VersionTolerant());
     [Fact] public void CircularReference() => Check(nameof(CircularReference), GoldenData.Circular());
     [Fact] public void Unusual() => Check(nameof(Unusual), GoldenData.Unusual());
+    [Fact] public void BigIntegers() => Check(nameof(BigIntegers), GoldenData.BigIntegers());
+
+    // A BigInteger is [int32 byte count][little-endian two's-complement bytes].
+    [Fact]
+    public void BigIntegerBytes()
+    {
+        MemoryPackSerializer.Serialize(new BigInteger(258)).Should().Equal(2, 0, 0, 0, 0x02, 0x01);
+        MemoryPackSerializer.Serialize(BigInteger.MinusOne).Should().Equal(1, 0, 0, 0, 0xFF);
+    }
+
+    // Before the writer was fixed it wrote the unused tail of its 255-byte scratch buffer: all
+    // zeros, which still read back, as 0.
+    [Fact]
+    public void BigIntegerWrittenBeforeTheFixReadsAsZero()
+    {
+        var old = new byte[4 + 254];
+        BitConverter.GetBytes(254).CopyTo(old, 0);
+        MemoryPackSerializer.Deserialize<BigInteger>(old).Should().Be(BigInteger.Zero);
+    }
 
     // Top-level arrays of unmanaged elements, and an empty and a null one.
     [Fact] public void TopLevelIntArray() => Check(nameof(TopLevelIntArray), new[] { 3, -4, int.MaxValue });
@@ -131,6 +151,13 @@ static class GoldenData
         root.Children = new[] { child, other, child };
         return root;
     }
+
+    // Zero, one byte each way, a sign-bit boundary, and a value past the 255-byte scratch buffer.
+    public static BigInteger[] BigIntegers() => new[]
+    {
+        BigInteger.Zero, BigInteger.One, BigInteger.MinusOne, new BigInteger(128), new BigInteger(-129),
+        BigInteger.Pow(2, 200) + 12345, -BigInteger.Pow(3, 150), BigInteger.Pow(7, 1000),
+    };
 
     public static GoldenUnusual Unusual()
     {
@@ -275,7 +302,6 @@ public partial class GoldenUnusual
 {
     public int[,]? Grid { get; set; }
     public BitArray? Bits { get; set; }
-    // No BigInteger: its writer emits the unused tail of its scratch buffer, so every value reads back as 0.
     public (int, string, double) Tuple { get; set; }
     public KeyValuePair<string, int> Pair { get; set; }
     public Uri? Uri { get; set; }

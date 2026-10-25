@@ -15,7 +15,7 @@ public sealed class BigIntegerFormatter : MemoryPackFormatter<BigInteger>
         Span<byte> temp = stackalloc byte[255];
         if (value.TryWriteBytes(temp, out var written))
         {
-            writer.WriteUnmanagedSpan(temp.Slice(written));
+            writer.WriteUnmanagedSpan(temp.Slice(0, written));
             return;
         }
         else

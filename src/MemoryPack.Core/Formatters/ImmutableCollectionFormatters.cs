@@ -64,21 +64,8 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-#if NET8_0_OR_GREATER
             value = ImmutableCollectionsMarshal.AsImmutableArray(array);
-#else
-            // create Empty and replace inner T[] field(avoid defensive copy of Create)
-            value = ImmutableArray.Create<T?>();
-            ref var view = ref Unsafe.As<ImmutableArray<T?>, ImmutableArrayView<T?>>(ref value);
-            view.array = array;
-#endif
         }
-    }
-
-    [Preserve]
-    internal struct ImmutableArrayView<T>
-    {
-        public T[]? array;
     }
 
     [Preserve]
@@ -370,12 +357,13 @@ namespace MemoryPack.Formatters
                 return;
             }
 
+            var keyComparer = HashFloodingResistantEqualityComparer.Resolve(keyEqualityComparer, reader.Options);
             if (length == 0)
             {
                 value = ImmutableDictionary<TKey, TValue?>.Empty;
-                if (keyEqualityComparer != null || valueEqualityComparer != null)
+                if (keyComparer != null || valueEqualityComparer != null)
                 {
-                    value = value.WithComparers(keyEqualityComparer, valueEqualityComparer);
+                    value = value.WithComparers(keyComparer, valueEqualityComparer);
                 }
                 return;
             }
@@ -383,7 +371,7 @@ namespace MemoryPack.Formatters
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
 
-            var builder = ImmutableDictionary.CreateBuilder<TKey, TValue?>(keyEqualityComparer, valueEqualityComparer);
+            var builder = ImmutableDictionary.CreateBuilder<TKey, TValue?>(keyComparer, valueEqualityComparer);
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
@@ -437,12 +425,13 @@ namespace MemoryPack.Formatters
                 return;
             }
 
+            var comparer = HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options);
             if (length == 0)
             {
                 value = ImmutableHashSet<T?>.Empty;
-                if (equalityComparer != null)
+                if (comparer != null)
                 {
-                    value = value.WithComparer(equalityComparer);
+                    value = value.WithComparer(comparer);
                 }
                 return;
             }
@@ -450,13 +439,13 @@ namespace MemoryPack.Formatters
             if (length == 1)
             {
                 var item = reader.ReadValue<T>();
-                value = ImmutableHashSet.Create(equalityComparer, item);
+                value = ImmutableHashSet.Create(comparer, item);
                 return;
             }
 
             var formatter = reader.GetFormatter<T?>();
 
-            var builder = ImmutableHashSet.CreateBuilder<T?>(equalityComparer);
+            var builder = ImmutableHashSet.CreateBuilder<T?>(comparer);
             for (int i = 0; i < length; i++)
             {
                 T? item = default;
@@ -901,11 +890,12 @@ namespace MemoryPack.Formatters
                 return;
             }
 
+            var keyComparer = HashFloodingResistantEqualityComparer.Resolve(keyEqualityComparer, reader.Options);
             if (length == 0)
             {
-                if (keyEqualityComparer != null || valueEqualityComparer != null)
+                if (keyComparer != null || valueEqualityComparer != null)
                 {
-                    value = ImmutableDictionary<TKey, TValue?>.Empty.WithComparers(keyEqualityComparer, valueEqualityComparer);
+                    value = ImmutableDictionary<TKey, TValue?>.Empty.WithComparers(keyComparer, valueEqualityComparer);
                 }
                 else
                 {
@@ -917,7 +907,7 @@ namespace MemoryPack.Formatters
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
 
-            var builder = ImmutableDictionary.CreateBuilder<TKey, TValue?>(keyEqualityComparer, valueEqualityComparer);
+            var builder = ImmutableDictionary.CreateBuilder<TKey, TValue?>(keyComparer, valueEqualityComparer);
             for (int i = 0; i < length; i++)
             {
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
@@ -971,11 +961,12 @@ namespace MemoryPack.Formatters
                 return;
             }
 
+            var comparer = HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options);
             if (length == 0)
             {
-                if (equalityComparer != null)
+                if (comparer != null)
                 {
-                    value = ImmutableHashSet<T?>.Empty.WithComparer(equalityComparer);
+                    value = ImmutableHashSet<T?>.Empty.WithComparer(comparer);
                 }
                 else
                 {
@@ -987,13 +978,13 @@ namespace MemoryPack.Formatters
             if (length == 1)
             {
                 var item = reader.ReadValue<T>();
-                value = ImmutableHashSet.Create(equalityComparer, item);
+                value = ImmutableHashSet.Create(comparer, item);
                 return;
             }
 
             var formatter = reader.GetFormatter<T?>();
 
-            var builder = ImmutableHashSet.CreateBuilder<T?>(equalityComparer);
+            var builder = ImmutableHashSet.CreateBuilder<T?>(comparer);
             for (int i = 0; i < length; i++)
             {
                 T? item = default;

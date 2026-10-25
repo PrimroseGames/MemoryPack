@@ -19,8 +19,9 @@ public class FrozenCollectionFormatterTest
 
         var value = set.ToFrozenSet();
         var bin = MemoryPackSerializer.Serialize(value);
+        // Read back with a keyed hash, so it enumerates in another order.
         var deserializedValue = MemoryPackSerializer.Deserialize<FrozenSet<int>>(bin);
-        deserializedValue.Should().Equal(value);
+        deserializedValue.Should().BeEquivalentTo(value);
     }
 
     [Fact]

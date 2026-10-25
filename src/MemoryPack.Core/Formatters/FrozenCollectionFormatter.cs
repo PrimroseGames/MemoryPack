@@ -1,5 +1,4 @@
-﻿#if NET8_0_OR_GREATER
-using MemoryPack.Formatters;
+﻿using MemoryPack.Formatters;
 using MemoryPack.Internal;
 using System.Collections.Frozen;
 
@@ -68,7 +67,8 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var dict = new Dictionary<TKey, TValue?>(length, equalityComparer);
+            var comparer = HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options);
+            var dict = new Dictionary<TKey, TValue?>(length, comparer);
 
             var keyFormatter = reader.GetFormatter<TKey>();
             var valueFormatter = reader.GetFormatter<TValue>();
@@ -77,7 +77,7 @@ namespace MemoryPack.Formatters
                 KeyValuePairFormatter.Deserialize(keyFormatter, valueFormatter, ref reader, out var k, out var v);
                 dict.Add(k!, v);
             }
-            value = dict.ToFrozenDictionary(equalityComparer);
+            value = dict.ToFrozenDictionary(comparer);
         }
     }
 
@@ -121,18 +121,18 @@ namespace MemoryPack.Formatters
                 return;
             }
 
-            var set = new HashSet<T>(length, equalityComparer);
+            var comparer = HashFloodingResistantEqualityComparer.Resolve(equalityComparer, reader.Options);
+            var set = new HashSet<T?>(length, comparer);
 
             var formatter = reader.GetFormatter<T?>();
             for (int i = 0; i < length; i++)
             {
                 T? v = default;
                 formatter.Deserialize(ref reader, ref v);
-                set.Add(v!);
+                set.Add(v);
             }
 
-            value = set.ToFrozenSet(equalityComparer)!;
+            value = set.ToFrozenSet(comparer);
         }
     }
 }
-#endif

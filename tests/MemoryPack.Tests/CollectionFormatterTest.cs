@@ -124,7 +124,16 @@ public class CollectionFormatterTest
         collection.Add(5);
 
         CollectionEqual(collection);
-        CollectionEqualReference(ref collection, x => collection!.Clear());
+
+        // An instance on the default comparer is replaced by one on a keyed hash; one with its own comparer is
+        // refilled (SecurityHashFloodingTest). With the option off it's refilled as before.
+        var options = MemoryPackSerializerOptions.Default with { HashFloodingResistant = false };
+        var bin = MemoryPackSerializer.Serialize(collection);
+        var original = collection;
+        collection.Clear();
+        MemoryPackSerializer.Deserialize(bin, ref collection, options);
+        collection.Should().BeSameAs(original);
+        collection.Should().Equal(1, 2, 3, 4, 5);
     }
 
 #if NET7_0_OR_GREATER

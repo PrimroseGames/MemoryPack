@@ -43,6 +43,13 @@
 
         readonly long maxBufferedStreamLength = 64 * 1024 * 1024;
 
+        /// <summary>
+        /// Whether hash collections a read builds hash integer-like keys (integers, enums, Guid, dates and the like)
+        /// with a keyed hash, so data can't choose keys that all collide and make each insert linear. String keys
+        /// are already safe, and a formatter given its own comparer keeps it. On by default.
+        /// </summary>
+        public bool HashFloodingResistant { get; init; } = true;
+
         internal const int DefaultMaxDepth = 1000;
     }
 
@@ -52,14 +59,3 @@
         Utf8,
     }
 }
-
-#if !NET5_0_OR_GREATER
-
-namespace System.Runtime.CompilerServices
-{
-    internal sealed class IsExternalInit
-    {
-    }
-}
-
-#endif

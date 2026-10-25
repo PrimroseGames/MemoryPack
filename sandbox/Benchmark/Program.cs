@@ -72,6 +72,8 @@ var config = ManualConfig.CreateMinimumViable()
 
 //BenchmarkRunner.Run<VersionTolerant>(config, args);
 
+//BenchmarkRunner.Run<HashFloodingResistance>(config, args);
+
 BenchmarkRunner.Run(typeof(JilBenchmark<>), config, args);
 
 //BenchmarkSwitcher.FromTypes(new[]{

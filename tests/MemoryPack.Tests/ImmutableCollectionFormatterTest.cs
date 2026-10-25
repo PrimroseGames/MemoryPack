@@ -45,9 +45,10 @@ public class ImmutableCollectionFormatterTest
             ConvertAs(value, default(IImmutableStack<int>)).Should().Equal(value);
         }
         {
+            // A set read back hashes its keys with a keyed hash, so it enumerates in another order.
             var value = ImmutableHashSet.Create(1, 10, 100, 2, 4, 530, 647, 73, 8, 42);
-            Convert(value).Should().Equal(value);
-            ConvertAs(value, default(IImmutableSet<int>)).Should().Equal(value);
+            Convert(value).Should().BeEquivalentTo(value);
+            ConvertAs(value, default(IImmutableSet<int>)).Should().BeEquivalentTo(value);
         }
         {
             var value = ImmutableSortedSet.Create(1, 10, 100, 2, 4, 530, 647, 73, 8, 42);

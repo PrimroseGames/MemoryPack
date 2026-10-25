@@ -18,7 +18,16 @@ public class WireGoldenTest
     [Fact] public void Primitives() => Check(nameof(Primitives), GoldenData.Primitives());
     [Fact] public void Strings() => Check(nameof(Strings), GoldenData.Strings());
     [Fact] public void StringsUtf16() => Check(nameof(StringsUtf16), GoldenData.Strings(), MemoryPackSerializerOptions.Utf16);
-    [Fact] public void Collections() => Check(nameof(Collections), GoldenData.Collections());
+    [Fact]
+    public void Collections()
+    {
+        // Read on the default comparers, so the immutable set enumerates as written and re-serializes byte for byte.
+        Check(nameof(Collections), GoldenData.Collections(), MemoryPackSerializerOptions.Default with { HashFloodingResistant = false });
+
+        // On keyed hashes it holds the same values in another order.
+        var read = MemoryPackSerializer.Deserialize<GoldenCollections>(LoadOrCapture(nameof(Collections), () => throw new InvalidOperationException()));
+        read.Should().BeEquivalentTo(GoldenData.Collections(), o => o.RespectingRuntimeTypes());
+    }
     [Fact] public void Union() => Check<IGoldenUnion[]>(nameof(Union), GoldenData.Union());
     [Fact] public void VersionTolerant() => Check(nameof(VersionTolerant), GoldenData.VersionTolerant());
     [Fact] public void CircularReference() => Check(nameof(CircularReference), GoldenData.Circular());

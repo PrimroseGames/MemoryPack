@@ -60,6 +60,24 @@ public static partial class MemoryPackFormatterProvider
 
 #endif
 
+    /// <summary>
+    /// Registers the formatters for <see cref="Type"/>, <see cref="System.Globalization.CultureInfo"/> and
+    /// <see cref="TimeZoneInfo"/>. Each reads a name from the data and looks it up, and a Type loads whatever type
+    /// and assembly the data names, so they aren't registered by default. Register them only for trusted data.
+    /// </summary>
+#if NET5_0_OR_GREATER
+    [RequiresUnreferencedCode("The data names the types to load, which trimming may have removed.")]
+#endif
+    public static void RegisterPayloadNamedTypeFormatters()
+    {
+        Register(new TypeFormatter());
+        Register(new ArrayFormatter<Type>());
+        Register(new CultureInfoFormatter());
+        Register(new ArrayFormatter<System.Globalization.CultureInfo>());
+        Register(new TimeZoneInfoFormatter());
+        Register(new ArrayFormatter<TimeZoneInfo>());
+    }
+
     public static void RegisterGenericType(Type genericType, Type genericFormatterType)
     {
         if (genericType.IsGenericType && genericFormatterType.IsGenericType)

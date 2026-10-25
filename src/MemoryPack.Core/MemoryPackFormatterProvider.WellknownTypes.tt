@@ -65,12 +65,9 @@
         .Select(x => x.Name)
         .Concat(new []
         {
-            "TimeZoneInfo",
             "BigInteger",
             "BitArray",
             "StringBuilder",
-            "Type",
-            "CultureInfo",
         });
 #>
 using MemoryPack.Formatters;

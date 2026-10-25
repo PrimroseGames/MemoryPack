@@ -1,4 +1,5 @@
 ﻿using MemoryPack.Internal;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 namespace MemoryPack.Formatters;
@@ -22,6 +23,14 @@ public sealed partial class TypeFormatter : MemoryPackFormatter<Type>
 
 #endif
 
+    // A Type read back is whatever type, in whatever assembly, the data names.
+#if NET5_0_OR_GREATER
+    [RequiresUnreferencedCode("The data names the types to load, which trimming may have removed.")]
+#endif
+    public TypeFormatter()
+    {
+    }
+
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref Type? value)
     {
@@ -37,6 +46,9 @@ public sealed partial class TypeFormatter : MemoryPackFormatter<Type>
     }
 
     [Preserve]
+#if NET5_0_OR_GREATER
+    [UnconditionalSuppressMessage("Trimming", "IL2057", Justification = "Constructing a TypeFormatter requires unreferenced code.")]
+#endif
     public override void Deserialize(ref MemoryPackReader reader, scoped ref Type? value)
     {
         var typeName = reader.ReadString();

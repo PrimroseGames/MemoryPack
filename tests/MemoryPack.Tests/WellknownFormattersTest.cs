@@ -41,12 +41,30 @@ public class WellknownFormattersTest
     {
         ConvertEqual(new Version(1, 3, 4, 5));
         ConvertEqual(new Uri("http://hoehoge.com/huu?q=takotako"));
-        ConvertEqual(TimeZoneInfo.Utc);
         var sb = new StringBuilder(new string('a', 99999));
         Convert(sb).ToString().Should().Be(sb.ToString());
-        ConvertEqual(typeof(WellknownFormattersTest));
         var bitArray = new BitArray(Enumerable.Range(1, 1000).Select(x => x % 3 == 0).ToArray());
         Convert(bitArray).OfType<bool>().ToArray().Should().Equal(bitArray.OfType<bool>().ToArray());
+    }
+
+    // One test, since registration is process-wide and can't be undone: nothing else registers these.
+    [Fact]
+    public void PayloadNamedTypesAreOptIn()
+    {
+        MemoryPackFormatterProvider.IsRegistered<Type>().Should().BeFalse();
+        MemoryPackFormatterProvider.IsRegistered<CultureInfo>().Should().BeFalse();
+        MemoryPackFormatterProvider.IsRegistered<TimeZoneInfo>().Should().BeFalse();
+
+        // A type name in the data no longer loads anything.
+        var name = MemoryPackSerializer.Serialize("System.Text.StringBuilder, System.Runtime");
+        var act = () => MemoryPackSerializer.Deserialize<Type>(name);
+        act.Should().Throw<MemoryPackSerializationException>();
+
+        MemoryPackFormatterProvider.RegisterPayloadNamedTypeFormatters();
+
+        ConvertEqual(TimeZoneInfo.Utc);
+        ConvertEqual(typeof(WellknownFormattersTest));
+        MemoryPackSerializer.Deserialize<Type>(name).Should().Be(typeof(StringBuilder));
         ConvertEqual(CultureInfo.InvariantCulture);
         ConvertEqual(CultureInfo.GetCultureInfo("ja"));
         ConvertEqual(CultureInfo.GetCultureInfo("ja-JP"));

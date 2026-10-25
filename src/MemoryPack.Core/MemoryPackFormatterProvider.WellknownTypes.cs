@@ -117,17 +117,11 @@ public static partial class MemoryPackFormatterProvider
         Register(new ArrayFormatter<Version>());
         Register(new UriFormatter());
         Register(new ArrayFormatter<Uri>());
-        Register(new TimeZoneInfoFormatter());
-        Register(new ArrayFormatter<TimeZoneInfo>());
         Register(new BigIntegerFormatter());
         Register(new ArrayFormatter<BigInteger>());
         Register(new BitArrayFormatter());
         Register(new ArrayFormatter<BitArray>());
         Register(new StringBuilderFormatter());
         Register(new ArrayFormatter<StringBuilder>());
-        Register(new TypeFormatter());
-        Register(new ArrayFormatter<Type>());
-        Register(new CultureInfoFormatter());
-        Register(new ArrayFormatter<CultureInfo>());
     }
 }

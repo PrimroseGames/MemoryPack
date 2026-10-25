@@ -5,12 +5,8 @@ using System.Runtime.InteropServices;
 
 namespace MemoryPack;
 
-#if NET7_0_OR_GREATER
 using static MemoryMarshal;
 using static GC;
-#else
-using static MemoryPack.Internal.MemoryMarshalEx;
-#endif
 
 public static partial class MemoryPackSerializer
 {
@@ -48,11 +44,7 @@ public static partial class MemoryPackSerializer
     }
 
     public static unsafe void Serialize<T, TBufferWriter>(in TBufferWriter bufferWriter, in T? value, MemoryPackSerializerOptions? options = default)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
         ref var bufferWriterRef = ref Unsafe.AsRef(in bufferWriter);
         if (!RuntimeHelpers.IsReferenceOrContainsReferences<T>())
@@ -83,11 +75,7 @@ public static partial class MemoryPackSerializer
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Serialize<T, TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, in T? value)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
         writer.WriteValue(value);
         writer.Flush();

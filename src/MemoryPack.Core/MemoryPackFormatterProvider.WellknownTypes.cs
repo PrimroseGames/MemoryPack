@@ -91,7 +91,6 @@ public static partial class MemoryPackFormatterProvider
         Register(new UnmanagedFormatter<Vector4>());
         Register(new UnmanagedArrayFormatter<Vector4>());
         Register(new NullableFormatter<Vector4>());
-#if NET7_0_OR_GREATER
         Register(new UnmanagedFormatter<Rune>());
         Register(new UnmanagedArrayFormatter<Rune>());
         Register(new NullableFormatter<Rune>());
@@ -110,7 +109,6 @@ public static partial class MemoryPackFormatterProvider
         Register(new UnmanagedFormatter<UInt128>());
         Register(new UnmanagedArrayFormatter<UInt128>());
         Register(new NullableFormatter<UInt128>());
-#endif
         Register(new StringFormatter());
         Register(new ArrayFormatter<String>());
         Register(new VersionFormatter());

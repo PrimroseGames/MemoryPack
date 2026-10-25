@@ -1,10 +1,7 @@
 ﻿using MemoryPack.Internal;
 using System.Runtime.CompilerServices;
-
-#if NET7_0_OR_GREATER
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-#endif
 
 namespace MemoryPack.Compression;
 
@@ -28,14 +25,9 @@ public sealed class BitPackFormatter : MemoryPackFormatter<bool[]>
         }
 
         var data = 0;
-#if NET7_0_OR_GREATER
         ref var item = ref MemoryMarshal.GetArrayDataReference(value);
-#else
-        ref var item = ref value[0];
-#endif
         ref var end = ref Unsafe.Add(ref item, value.Length);
 
-#if NET7_0_OR_GREATER
         if (value.Length >= 32)
         {
             ref var loopEnd = ref Unsafe.Subtract(ref end, 32);
@@ -77,7 +69,6 @@ public sealed class BitPackFormatter : MemoryPackFormatter<bool[]>
 
             data = 0;
         }
-#endif
         var bit = 0;
         while (Unsafe.IsAddressLessThan(ref item, ref end))
         {

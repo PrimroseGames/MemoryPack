@@ -7,31 +7,19 @@ using System.Runtime.InteropServices;
 
 namespace MemoryPack.Compression;
 
-#if !NET7_0_OR_GREATER
-#pragma warning disable CS8602
-#endif
-
 public
-#if NET7_0_OR_GREATER
     struct
-#else
-    class
-#endif
     BrotliCompressor : IBufferWriter<byte>, IDisposable
 {
     ReusableLinkedArrayBufferWriter? bufferWriter;
     readonly int quality;
     readonly int window;
 
-#if NET7_0_OR_GREATER
-
     public BrotliCompressor()
         : this(CompressionLevel.Fastest)
     {
 
     }
-
-#endif
 
     public BrotliCompressor(CompressionLevel compressionLevel)
         : this(BrotliUtils.GetQualityFromCompressionLevel(compressionLevel), BrotliUtils.WindowBits_Default)
@@ -195,11 +183,7 @@ public
     }
 
     public void CopyTo<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> memoryPackWriter)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
         ThrowIfDisposed();
 
@@ -253,11 +237,7 @@ public
     }
 
     static int CompressCore<TBufferWriter>(ref BrotliEncoder encoder, ReadOnlySpan<byte> source, ref MemoryPackWriter<TBufferWriter> destBufferWriter, int? initialLength, bool isFinalBlock)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
         var totalWritten = 0;
 
@@ -295,9 +275,7 @@ public
         bufferWriter = null!;
     }
 
-#if NET7_0_OR_GREATER
     [MemberNotNull(nameof(bufferWriter))]
-#endif
     void ThrowIfDisposed()
     {
         if (bufferWriter == null)
@@ -323,9 +301,7 @@ internal static partial class BrotliUtils
             CompressionLevel.NoCompression => Quality_Min,
             CompressionLevel.Fastest => 1,
             CompressionLevel.Optimal => Quality_Default,
-#if NET7_0_OR_GREATER
             CompressionLevel.SmallestSize => Quality_Max,
-#endif
             _ => throw new ArgumentException()
         };
 

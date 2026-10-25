@@ -64,7 +64,6 @@ public sealed class MemoryPackWriterOptionalState : IDisposable
 
     public (bool existsReference, uint id) GetOrAddReference(object value)
     {
-#if NET7_0_OR_GREATER
         ref var id = ref CollectionsMarshal.GetValueRefOrAddDefault(objectToRef, value, out var exists);
         if (exists)
         {
@@ -75,37 +74,10 @@ public sealed class MemoryPackWriterOptionalState : IDisposable
             id = nextId++;
             return (false, id);
         }
-#else
-        if (objectToRef.TryGetValue(value, out var id))
-        {
-            return (true, id);
-        }
-        else
-        {
-            id = nextId++;
-            objectToRef.Add(value, id);
-            return (false, id);
-        }
-#endif
     }
 
     void IDisposable.Dispose()
     {
         MemoryPackWriterOptionalStatePool.Return(this);
-    }
-
-    // ReferenceEqualityComparer is exsits in .NET 6 but NetStandard 2.1 does not.
-    sealed class ReferenceEqualityComparer : IEqualityComparer<object>
-    {
-        ReferenceEqualityComparer() { }
-
-        public static ReferenceEqualityComparer Instance { get; } = new ReferenceEqualityComparer();
-
-        public new bool Equals(object? x, object? y) => ReferenceEquals(x, y);
-
-        public int GetHashCode(object obj)
-        {
-            return RuntimeHelpers.GetHashCode(obj);
-        }
     }
 }

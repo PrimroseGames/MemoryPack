@@ -92,8 +92,6 @@ public sealed class MemoryPackOrderAttribute : Attribute
     }
 }
 
-#if !UNITY_2021_2_OR_NEWER
-
 [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property, AllowMultiple = false, Inherited = false)]
 public abstract class MemoryPackCustomFormatterAttribute<T> : Attribute
 {
@@ -106,8 +104,6 @@ public abstract class MemoryPackCustomFormatterAttribute<TFormatter, T> : Attrib
 {
     public abstract TFormatter GetFormatter();
 }
-
-#endif
 
 // similar naming as System.Text.Json attribtues
 // https://docs.microsoft.com/en-us/dotnet/api/system.text.json.serialization.jsonattribute

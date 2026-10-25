@@ -1,13 +1,15 @@
 ﻿using MemoryPack.Internal;
+using System.Buffers;
 using System.Collections;
-using System.Runtime.CompilerServices;
 
 namespace MemoryPack.Formatters;
 
 [Preserve]
 public sealed class BitArrayFormatter : MemoryPackFormatter<BitArray>
 {
-    // serialize [m_length, m_array]
+    // Serialized as [length, int[] of the bits]. The array holds exactly the ints the length needs, with the bits
+    // past the length clear. Only the public API is used: the runtime's own array is sized by its version (.NET 11
+    // pads it), so writing it out made the bytes depend on the runtime.
 
     [Preserve]
     public override void Serialize<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer, scoped ref BitArray? value)
@@ -18,10 +20,24 @@ public sealed class BitArrayFormatter : MemoryPackFormatter<BitArray>
             return;
         }
 
-        ref var view = ref Unsafe.As<BitArray, BitArrayView>(ref value);
+        var length = value.Length;
+        var count = (int)((length + 31L) / 32);
+        var ints = ArrayPool<int>.Shared.Rent(Math.Max(count, 1));
+        try
+        {
+            value.CopyTo(ints, 0);
+            if ((length & 31) != 0)
+            {
+                ints[count - 1] &= (1 << (length & 31)) - 1;
+            }
 
-        writer.WriteUnmanagedWithObjectHeader(2, view.m_length);
-        writer.WriteUnmanagedArray(view.m_array);
+            writer.WriteUnmanagedWithObjectHeader(2, length);
+            writer.WriteUnmanagedSpan(ints.AsSpan(0, count));
+        }
+        finally
+        {
+            ArrayPool<int>.Shared.Return(ints);
+        }
     }
 
     [Preserve]
@@ -37,8 +53,8 @@ public sealed class BitArrayFormatter : MemoryPackFormatter<BitArray>
 
         reader.ReadUnmanaged(out int length);
 
-        // The array is read before anything is sized by length, and has to hold length bits. It can
-        // be longer: a BitArray keeps its array when shortened by less than its shrink threshold.
+        // The array is read before anything is sized by length, and has to hold length bits. It can be longer:
+        // older writers wrote the runtime's own array, which may be padded or kept from a longer length.
         int[]? array = null;
         reader.ReadUnmanagedArray(ref array);
         if (array == null || length < 0 || (length + 31L) / 32 > array.Length)
@@ -46,21 +62,19 @@ public sealed class BitArrayFormatter : MemoryPackFormatter<BitArray>
             MemoryPackSerializationException.ThrowInvalidLength(length);
         }
 
-        var bitArray = new BitArray(0);
-
-        ref var view = ref Unsafe.As<BitArray, BitArrayView>(ref bitArray);
-        view.m_array = array;
-        view.m_length = length;
-
-        value = bitArray;
+        var needed = (int)((length + 31L) / 32);
+        if (needed <= int.MaxValue / 32)
+        {
+            value = new BitArray(needed == array.Length ? array : array.AsSpan(0, needed).ToArray()) { Length = length };
+        }
+        else
+        {
+            // Within 32 bits of int.MaxValue, more than BitArray(int[]) can hold, so bit by bit.
+            value = new BitArray(length);
+            for (int i = 0; i < length; i++)
+            {
+                if ((array[i >> 5] & (1 << (i & 31))) != 0) value[i] = true;
+            }
+        }
     }
-}
-
-#pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-[Preserve]
-internal class BitArrayView
-{
-    public int[] m_array;
-    public int m_length;
-    public int _version;
 }

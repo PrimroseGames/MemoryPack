@@ -19,9 +19,6 @@ partial class MemoryPackGenerator
 
     void RegisterCallSiteRegistration(IncrementalGeneratorInitializationContext context)
     {
-        var parseOptions = context.ParseOptionsProvider
-            .Select(static (parseOptions, token) => parseOptions.PreprocessorSymbolNames.Contains("NET7_0_OR_GREATER"));
-
         var callSiteTypes = context.SyntaxProvider.CreateSyntaxProvider(
                 predicate: static (node, token) => node is InvocationExpressionSyntax invocation && InvokedName(invocation.Expression) is { } name && CallSiteMethodNames.Contains(name),
                 transform: static (context, token) =>
@@ -39,12 +36,11 @@ partial class MemoryPackGenerator
             .WithTrackingName("MemoryPack.CallSite.1_TypeArguments");
 
         var source = callSiteTypes
-            .Combine(context.CompilationProvider)
-            .Combine(parseOptions);
+            .Combine(context.CompilationProvider);
 
         context.RegisterSourceOutput(source, static (context, source) =>
         {
-            var ((types, compilation), net7) = source;
+            var (types, compilation) = source;
             if (types.IsDefaultOrEmpty) return;
             if (compilation.GetTypeByMetadataName("System.Runtime.CompilerServices.ModuleInitializerAttribute") == null) return;
             if (compilation.GetTypeByMetadataName("MemoryPack.MemoryPackFormatterProvider") == null) return;
@@ -64,7 +60,6 @@ partial class MemoryPackGenerator
 
                 var formatter = reference.KnownTypes.GetNonDefaultFormatterName(type);
                 if (formatter == null) continue;
-                if (!net7 && (formatter.StartsWith("global::MemoryPack.Formatters.InterfaceReadOnlySetFormatter") || formatter.StartsWith("global::MemoryPack.Formatters.PriorityQueueFormatter"))) continue;
 
                 registrations[type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)] = formatter;
             }

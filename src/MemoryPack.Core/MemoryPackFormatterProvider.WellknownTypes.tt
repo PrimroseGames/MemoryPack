@@ -87,13 +87,11 @@ public static partial class MemoryPackFormatterProvider
         Register(new UnmanagedArrayFormatter<<#= item #>>());
         Register(new NullableFormatter<<#= item #>>());
 <# } #>
-#if NET7_0_OR_GREATER
 <# foreach(var item in net7UnmanagedTypeNames) { #>
         Register(new UnmanagedFormatter<<#= item #>>());
         Register(new UnmanagedArrayFormatter<<#= item #>>());
         Register(new NullableFormatter<<#= item #>>());
 <# } #>
-#endif
 <# foreach(var item in knownTypesNames) { #>
         Register(new <#= item #>Formatter());
         Register(new ArrayFormatter<<#= item #>>());

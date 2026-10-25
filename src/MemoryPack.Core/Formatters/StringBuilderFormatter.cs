@@ -17,28 +17,17 @@ public sealed class StringBuilderFormatter : MemoryPackFormatter<StringBuilder>
             return;
         }
 
-#if NET7_0_OR_GREATER
+        // Always UTF-16, whatever the options' string encoding.
+        writer.WriteCollectionHeader(value.Length);
 
-        // for performance reason, currently StringBuilder encode as Utf16, however try to write Utf8?
-        // if (writer.Options.StringEncoding == StringEncoding.Utf16)
+        foreach (var chunk in value.GetChunks())
         {
-            writer.WriteCollectionHeader(value.Length);
+            ref var p = ref writer.GetSpanReference(checked(chunk.Length * 2));
+            ref var src = ref Unsafe.As<char, byte>(ref MemoryMarshal.GetReference(chunk.Span));
+            Unsafe.CopyBlockUnaligned(ref p, ref src, (uint)chunk.Length * 2);
 
-            foreach (var chunk in value.GetChunks())
-            {
-                ref var p = ref writer.GetSpanReference(checked(chunk.Length * 2));
-                ref var src = ref Unsafe.As<char, byte>(ref MemoryMarshal.GetReference(chunk.Span));
-                Unsafe.CopyBlockUnaligned(ref p, ref src, (uint)chunk.Length * 2);
-
-                writer.Advance(chunk.Length * 2);
-            }
-            return;
+            writer.Advance(chunk.Length * 2);
         }
-
-#else
-        // write as utf16
-        writer.WriteUtf16(value.ToString());
-#endif
     }
 
     [Preserve]

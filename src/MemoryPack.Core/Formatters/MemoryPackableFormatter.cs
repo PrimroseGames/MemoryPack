@@ -3,8 +3,6 @@ using System.Runtime.CompilerServices;
 
 namespace MemoryPack.Formatters;
 
-#if NET7_0_OR_GREATER
-
 [Preserve]
 public sealed class MemoryPackableFormatter<T> : MemoryPackFormatter<T>
     where T : IMemoryPackable<T>
@@ -21,5 +19,3 @@ public sealed class MemoryPackableFormatter<T> : MemoryPackFormatter<T>
         T.Deserialize(ref reader, ref value);
     }
 }
-
-#endif

@@ -59,16 +59,6 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
             })
             .WithTrackingName("MemoryPack.MemoryPackable.0_AnalyzerConfigOptionsProvider"); // annotate for IncrementalGeneratorTest
 
-        var parseOptions = context.ParseOptionsProvider
-            .Select((parseOptions, token) =>
-            {
-                var csOptions = (CSharpParseOptions)parseOptions;
-                var langVersion = csOptions.LanguageVersion;
-                var net7 = csOptions.PreprocessorSymbolNames.Contains("NET7_0_OR_GREATER");
-                return (langVersion, net7);
-            })
-            .WithTrackingName("MemoryPack.MemoryPackable.0_ParseOptionsProvider");
-
         var typeDeclarations = context.SyntaxProvider.ForAttributeWithMetadataName(
                 MemoryPackableAttributeFullName,
                 predicate: static (node, token) =>
@@ -102,16 +92,14 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
                 .Combine(context.CompilationProvider)
                 .WithComparer(Comparer.Instance)
                 .Combine(logProvider)
-                .Combine(parseOptions)
                 .WithTrackingName("MemoryPack.MemoryPackable.2_MemoryPackableCombined");
 
             context.RegisterSourceOutput(source, static (context, source) =>
             {
-                var (typeDeclaration, compilation) = source.Left.Item1;
-                var logPath = source.Left.Item2;
-                var (langVersion, net7) = source.Right;
+                var (typeDeclaration, compilation) = source.Left;
+                var logPath = source.Right;
 
-                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion, net7));
+                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context));
             });
         }
         {
@@ -145,16 +133,14 @@ public partial class MemoryPackGenerator : IIncrementalGenerator
                 .Combine(context.CompilationProvider)
                 .WithComparer(Comparer.Instance)
                 .Combine(logProvider)
-                .Combine(parseOptions)
                 .WithTrackingName("MemoryPack.MemoryPackable.2_MemoryPackUnionCombined");
 
             context.RegisterSourceOutput(source, static (context, source) =>
             {
-                var (typeDeclaration, compilation) = source.Left.Item1;
-                var logPath = source.Left.Item2;
-                var (langVersion, net7) = source.Right;
+                var (typeDeclaration, compilation) = source.Left;
+                var logPath = source.Right;
 
-                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context, langVersion, net7));
+                Generate(typeDeclaration, compilation, logPath, new GeneratorContext(context));
             });
         }
     }
@@ -371,20 +357,12 @@ namespace MemoryPack.Generated
     {
         SourceProductionContext context;
 
-        public GeneratorContext(SourceProductionContext context, LanguageVersion languageVersion, bool isNet70OrGreater)
+        public GeneratorContext(SourceProductionContext context)
         {
             this.context = context;
-            this.LanguageVersion = languageVersion;
-            this.IsNet7OrGreater = isNet70OrGreater;
         }
 
         public CancellationToken CancellationToken => context.CancellationToken;
-
-        public Microsoft.CodeAnalysis.CSharp.LanguageVersion LanguageVersion { get; }
-
-        public bool IsNet7OrGreater { get; }
-
-        public bool IsForUnity => false;
 
         public void AddSource(string hintName, string source)
         {

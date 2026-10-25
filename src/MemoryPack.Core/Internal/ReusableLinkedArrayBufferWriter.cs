@@ -6,12 +6,8 @@ using System.Runtime.InteropServices;
 
 namespace MemoryPack.Internal;
 
-#if NET7_0_OR_GREATER
 using static GC;
 using static MemoryMarshal;
-#else
-using static MemoryPack.Internal.MemoryMarshalEx;
-#endif
 
 // internal but used by generator code
 
@@ -142,11 +138,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
         if (buffers.Count > 0)
         {
-#if NET7_0_OR_GREATER
             foreach (ref var item in CollectionsMarshal.AsSpan(buffers))
-#else
-            foreach (var item in buffers)
-#endif
             {
                 item.WrittenBuffer.CopyTo(dest);
                 dest = dest.Slice(item.WrittenCount);
@@ -165,11 +157,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
     }
 
     public void WriteToAndReset<TBufferWriter>(ref MemoryPackWriter<TBufferWriter> writer)
-#if NET7_0_OR_GREATER
         where TBufferWriter : IBufferWriter<byte>
-#else
-        where TBufferWriter : class, IBufferWriter<byte>
-#endif
     {
         if (totalWritten == 0) return;
 
@@ -182,11 +170,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
 
         if (buffers.Count > 0)
         {
-#if NET7_0_OR_GREATER
             foreach (ref var item in CollectionsMarshal.AsSpan(buffers))
-#else
-            foreach (var item in buffers)
-#endif
             {
                 ref var spanRef = ref writer.GetSpanReference(item.WrittenCount);
                 item.WrittenBuffer.CopyTo(MemoryMarshal.CreateSpan(ref spanRef, item.WrittenCount));
@@ -253,11 +237,7 @@ public sealed class ReusableLinkedArrayBufferWriter : IBufferWriter<byte>
     public void Reset()
     {
         if (totalWritten == 0) return;
-#if NET7_0_OR_GREATER
         foreach (ref var item in CollectionsMarshal.AsSpan(buffers))
-#else
-        foreach (var item in buffers)
-#endif
         {
             item.Clear();
         }

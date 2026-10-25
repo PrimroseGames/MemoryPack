@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net7.0;netstandard2.1</TargetFrameworks>
+        <TargetFramework>net11.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <NoWarn>$(NoWarn);CS1591;CA2255</NoWarn>
@@ -13,9 +13,6 @@
         <Description>Additional streaming support for MemoryPack.</Description>
     </PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="System.IO.Pipelines" Version="6.0.3" />
-    </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\MemoryPack.Core\MemoryPack.Core.csproj" />

@@ -1,56 +1,38 @@
-﻿#if NET7_0_OR_GREATER
-
-#pragma warning disable CS8618
-#pragma warning disable CS0649
-
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace MemoryPack.Internal;
 
 internal static class CollectionsMarshalEx
 {
-    /// <summary>
-    /// similar as AsSpan but modify size to create fixed-size span.
-    /// </summary>
+    /// <summary>Sets the list's count to <paramref name="length"/> and returns its items as a span.</summary>
     public static Span<T?> CreateSpan<T>(List<T?> list, int length)
     {
-        list.EnsureCapacity(length);
-
-        ref var view = ref Unsafe.As<List<T?>, ListView<T?>>(ref list);
-        view._size = length;
-        return view._items.AsSpan(0, length);
+        CollectionsMarshal.SetCount(list, length);
+        return CollectionsMarshal.AsSpan(list);
     }
 
     public static Span<T?> AsSpan<T>(Stack<T?> stack)
     {
-        ref var view = ref Unsafe.As<Stack<T?>, StackView<T?>>(ref stack);
-        return view._items.AsSpan(0, view._size);
+        return StackFields<T?>.Items(stack).AsSpan(0, StackFields<T?>.Size(stack));
     }
 
+    /// <summary>Sets the stack's count to <paramref name="length"/> and returns its items, bottom first, as a span.</summary>
     public static Span<T?> CreateSpan<T>(Stack<T?> stack, int length)
     {
         stack.EnsureCapacity(length);
-
-        ref var view = ref Unsafe.As<Stack<T?>, StackView<T?>>(ref stack);
-        view._size = length;
-        return view._items.AsSpan(0, view._size);
+        StackFields<T?>.Size(stack) = length;
+        return StackFields<T?>.Items(stack).AsSpan(0, length);
     }
 
-    // NOTE: These structure depndent on .NET 7, if changed, require to keep same structure.
-
-    internal sealed class ListView<T>
+    // Stack<T> has no public span access. These bind to its fields by name, so a runtime that renames them
+    // throws MissingFieldException instead of the stack's memory being misread.
+    static class StackFields<T>
     {
-        public T[] _items;
-        public int _size;
-        public int _version;
-    }
+        [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_array")]
+        public static extern ref T[] Items(Stack<T> stack);
 
-    internal sealed class StackView<T>
-    {
-        public T[] _items;
-        public int _size;
-        public int _version;
+        [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "_size")]
+        public static extern ref int Size(Stack<T> stack);
     }
 }
-
-#endif

@@ -5,7 +5,7 @@ using System.Text;
 namespace MemoryPack.Generator;
 
 // MemoryPackGenerator_ValidateEnumsAndBools: checks on what the reader copies as raw bytes. An enum
-// without [Flags] must hold a declared value or zero, a bool is normalized to 0 or 1, a Nullable's
+// without [Flags] must hold a declared value, zero or a value its [MemoryPackEnumRange]s span, a bool is normalized to 0 or 1, a Nullable's
 // has-value flag must be 0 or 1, DateTime, DateTimeOffset, DateOnly, TimeOnly, decimal and Rune must
 // hold values their constructors allow, and an unmanaged struct checks its fields. Generated types register the checks with
 // UnmanagedValidator<T>, which the reader runs after every raw copy, and run them on the members
@@ -315,9 +315,19 @@ public partial class TypeMeta
                 .Select(x => $"{name}.@{x.Name}")
                 .ToArray();
 
+            // A [MemoryPackEnumRange] takes the values it spans.
+            var ranges = new StringBuilder();
+            foreach (var range in enumType.GetAttributes())
+            {
+                if (range.AttributeClass?.ToDisplayString() != "MemoryPack.MemoryPackEnumRangeAttribute" || range.ConstructorArguments.Length != 2) continue;
+                var first = System.Convert.ToInt64(range.ConstructorArguments[0].Value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                var end = System.Convert.ToInt64(range.ConstructorArguments[1].Value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+                ranges.Append($" && !(unchecked((long){value}) >= {first}L && unchecked((long){value}) < {end}L)");
+            }
+
             // Zero is default(T), which any field holds before it's set, so it's always accepted.
-            if (members.Length == 0) return $"{value} != 0";
-            return $"{value} is not ({string.Join(" or ", members)}) && {value} != 0";
+            if (members.Length == 0) return $"{value} != 0{ranges}";
+            return $"{value} is not ({string.Join(" or ", members)}) && {value} != 0{ranges}";
         }
 
         // The fields a raw copy of t holds that need checks, as reached from the type `from`. An

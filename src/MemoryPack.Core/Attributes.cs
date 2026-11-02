@@ -145,6 +145,20 @@ public sealed class MemoryPackOnDeserializedAttribute : Attribute
 
 // Others
 
+/// <summary>Values from <see cref="First"/> up to (not including) <see cref="End"/> read back though no member names them.</summary>
+[AttributeUsage(AttributeTargets.Enum, AllowMultiple = true, Inherited = false)]
+public sealed class MemoryPackEnumRangeAttribute : Attribute
+{
+    public long First { get; }
+    public long End { get; }
+
+    public MemoryPackEnumRangeAttribute(long first, long end)
+    {
+        First = first;
+        End = end;
+    }
+}
+
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = false, Inherited = false)]
 public sealed class GenerateTypeScriptAttribute : Attribute
 {

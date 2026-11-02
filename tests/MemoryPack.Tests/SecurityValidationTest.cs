@@ -50,6 +50,16 @@ public class SecurityValidationTest
     }
 
     [Fact]
+    public void EnumRangeTakesTheValuesItSpans()
+    {
+        var bytes = MemoryPackSerializer.Serialize(new ValidatedRangeHolder { Value = ValidatedSlot.Fixed });
+        MemoryPackSerializer.Deserialize<ValidatedRangeHolder>(Patch(bytes, 1, 10))!.Value.Should().Be((ValidatedSlot)10);
+        MemoryPackSerializer.Deserialize<ValidatedRangeHolder>(Patch(bytes, 1, 19))!.Value.Should().Be((ValidatedSlot)19);
+        Rejects<ValidatedRangeHolder>(Patch(bytes, 1, 25));
+        Rejects<ValidatedRangeHolder>(Patch(bytes, 1, 5));
+    }
+
+    [Fact]
     public void BoolMemberIsNormalized()
     {
         var bytes = MemoryPackSerializer.Serialize(new ValidatedBoolHolder { Value = true });
@@ -208,6 +218,20 @@ public partial class ValidatedEnumHolder
 public partial class ValidatedFlagsHolder
 {
     public ValidatedPerms Value;
+}
+
+[MemoryPackEnumRange((long)ValidatedSlot.Indexed, (long)ValidatedSlot.IndexedEnd)]
+public enum ValidatedSlot : ushort
+{
+    Fixed = 1,
+    Indexed = 10,
+    IndexedEnd = 20,
+}
+
+[MemoryPackable]
+public partial class ValidatedRangeHolder
+{
+    public ValidatedSlot Value;
 }
 
 [MemoryPackable]
